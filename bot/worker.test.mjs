@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { route, size, findSymbol, toMt5 } from "./worker.js";
+import { route, size, findSymbol, toMt5, tvMessage } from "./worker.js";
 
 const snap = JSON.parse(fs.readFileSync(new URL("./fixtures/snapshot.sample.json", import.meta.url)));
 const strip = (s) => s.replace(/<[^>]+>/g, "");
@@ -52,4 +52,12 @@ test("grade A above 0.5 warns, C is 0.125", () => {
   const s = fake("6E", 1.0909, 1.0874, "EURUSD", "same", 0.00005, 0.0001);
   assert.match(strip(size(s, "6E", 1.0909, 1.0889, "1", 100000)), /Above your grade A/);
   assert.match(strip(size(s, "6E", 1.0909, 1.0889, "C", 100000)), /risk 0\.125%/);
+});
+
+test("TradingView alerts become Telegram messages with a flag", () => {
+  assert.match(tvMessage("6E1! 240 · SOS confirmed — bullish: Re-accumulation"), /^● <b>TradingView<\/b> · 6E1! 240 · SOS confirmed/);
+  assert.match(tvMessage("6E1! 60 · SOS failed — price is back in the range, it is still going on (SOS → UA)"), /^↺/);
+  assert.match(tvMessage("GC1! 240 · left the range — Distribution confirmed"), /^⚑/);
+  assert.match(tvMessage('{"text":"6B1! 60 · Spring #3"}'), /Spring #3/);
+  assert.ok(!tvMessage("<script>").includes("<script>"));
 });

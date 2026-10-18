@@ -62,6 +62,8 @@ jobs:
           printf '%s' "$TELEGRAM_TOKEN"   | npx --yes wrangler@4 secret put TELEGRAM_TOKEN
           printf '%s' "$TELEGRAM_CHAT_ID" | npx --yes wrangler@4 secret put TELEGRAM_CHAT_ID
           printf '%s' "$WEBHOOK_SECRET"   | npx --yes wrangler@4 secret put WEBHOOK_SECRET
+          TV_KEY=$(printf 'tv:%s' "$TELEGRAM_TOKEN" | sha256sum | cut -c1-32)
+          printf '%s' "$TV_KEY"           | npx --yes wrangler@4 secret put TV_KEY
           if [ -n "$ACCOUNT_BALANCE" ]; then
             printf '%s' "$ACCOUNT_BALANCE" | npx --yes wrangler@4 secret put ACCOUNT_BALANCE
           fi
@@ -94,4 +96,8 @@ jobs:
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
             --data-urlencode "text=Pipdon BOT · 💬 I can answer now. Send /help or just ask, e.g. \"how's gold\"." > /dev/null
+          TV_KEY=$(printf 'tv:%s' "$TELEGRAM_TOKEN" | sha256sum | cut -c1-32)
+          curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=Pipdon BOT · 📐 TradingView alerts: paste this as the alert's Webhook URL (keep it private): $URL/tv/$TV_KEY" > /dev/null
           echo "Bot live at $URL"

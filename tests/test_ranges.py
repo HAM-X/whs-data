@@ -108,3 +108,26 @@ def test_early_phase_b_break_is_st_as_sow_not_the_spring():
     starts = {p[0]: p[1] for p in r.phases}
     assert starts["B"] < brk < starts["C"] == spr
     assert [p[0] for p in r.phases] == ["A", "B", "C", "D", "E"]
+
+
+def test_a_breakout_that_comes_back_means_the_range_goes_on():
+    # EURUSD Nov 2024: SOW 22 Nov came straight back (→ the range is still going on), the real SOW on 2 Jan,
+    # and the range was only LEFT once two pullbacks held below it (mid-January)
+    d, lab, eff = _load()
+    o, h, l, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+    r = ranges.read(o, h, l, c, eff, d.volume.to_numpy(float), lab.index("2024-11-14 14:00"),
+                    lab.index("2024-11-18 22:00"), htf=-1)
+    texts = [t for _, t in r.alerts]
+    back = next(k for k, t in enumerate(texts) if "still going on" in t)
+    left = next(k for k, t in enumerate(texts) if t.startswith("left the range"))
+    assert back < left and r.left and r.name == "Redistribution"
+    assert sum(e.name == "SOW" for e in r.events) == 1              # the failed one is gone from the chart
+    assert [p[0] for p in r.phases] == ["A", "B", "C", "D", "E"]  # its D/E were rolled back
+    assert r.box_end < r.end
+
+
+def test_a_range_is_alive_until_price_has_stayed_out():
+    d, lab, eff = _load()
+    a1, a2 = lab.index("2025-01-13 10:00"), lab.index("2025-01-27 14:00")
+    r = _read(d, eff, a1, a2)
+    assert r.outcome == 1 and not r.left and r.box_end == r.end == len(d) - 1

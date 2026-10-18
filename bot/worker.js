@@ -235,8 +235,26 @@ async function reply(env, chatId, text) {
   });
 }
 
+// TradingView alert → Telegram (WHS Range / Engine alerts). The webhook URL carries a private key: /tv/<TV_KEY>
+export function tvMessage(body) {
+  let t = String(body || "").trim();
+  try {
+    const j = JSON.parse(t);
+    if (j && typeof j === "object") t = j.text || j.message || JSON.stringify(j);
+  } catch (_) { /* plain text alert */ }
+  t = t.slice(0, 1500);
+  const flag = /left the range/.test(t) ? "⚑" : /still going on/.test(t) ? "↺" : /confirmed/.test(t) ? "●" : "📐";
+  return `${flag} <b>TradingView</b> · ${esc(t)}`;
+}
+
 export default {
   async fetch(request, env) {
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path.startsWith("/tv/")) {
+      if (!env.TV_KEY || path.slice(4) !== env.TV_KEY) return new Response("forbidden", { status: 403 });
+      await reply(env, env.TELEGRAM_CHAT_ID, tvMessage(await request.text()));
+      return new Response("ok");
+    }
     if (request.method !== "POST") return new Response("Pipdon BOT is running.", { status: 200 });
     if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) return new Response("forbidden", { status: 403 });
     const update = await request.json().catch(() => ({}));
