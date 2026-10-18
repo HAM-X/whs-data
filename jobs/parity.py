@@ -83,9 +83,7 @@ def main(path: str, tf: int, root: str | None = None) -> int:
         if common:
             k0 = common[0]
             rows.append(exact("R1 RBar (after sync)", rb_py[k0:], rb_pine[k0:]))
-            ext_py = np.full(len(d), np.nan)
-            for sw in led.swings:
-                ext_py[sw.confirm_i] = sw.extent_pct
+            ext_py = led.done_ext                       # the swing as finished on each RBar (after shift / fold)
             rows.append(compare(col(d, "R1 swing extent").iloc[k0 + 1:], ext_py[k0 + 1:], "R1 swing extent"))
             # swing traffic light needs two same-direction swings of shared history, sequences up to 6 more
             k1 = next((led.swings[j].confirm_i for j, sw in enumerate(led.swings) if sw.confirm_i > k0 and j >= 2

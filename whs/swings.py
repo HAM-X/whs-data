@@ -156,6 +156,7 @@ class SwingResult:
     sbar: np.ndarray = None
     tl: np.ndarray = None         # swing traffic light, written on the RBar that confirmed the swing
     seq: np.ndarray = None        # ±1 on the RBar of the BLUE swing that completes a sequence
+    done_ext: np.ndarray = None   # extent % of the swing as finished on that RBar (after shift/fold) — what Pine prints
 
 
 def classify(sw: "Swing", st: dict) -> None:
@@ -187,7 +188,31 @@ def classify(sw: "Swing", st: dict) -> None:
         sw.tl = TL_NONE
 
 
-def ledger(o, h, l, c, eff) -> SwingResult:
+# Swing rules v2 — calibrated on Hamza's R1 review (30 swings, 18 Oct 2026; 26 → 29 agreed)
+CLIMAX_K = 4.0          # a climactic bar: TR ≥ 4 × ATR[1]
+FOLLOW_G, FOLLOW_N = 0.5, 3   # ...keeps the reference against smaller (< 0.5 × its TR) SBars within 3 bars
+RELEASE_K = 1.5         # while a climactic bar holds the reference, an opposite SBar closing ≥ 1.5 ATR away turns it
+RETEST_FRAC, RETEST_K, RETEST_MIN = 0.9, 1.5, 2.0    # a swing ≥ 2 ATR retested ≥ 90 %, closing ≥ 1.5 ATR away, ends
+FOLD_ATR, FOLD_RATIO, FOLD_TOL = 1.5, 0.2, 0.25      # a counter-swing < 1.5 ATR and < 0.2 × the next swing folds in
+RULES_V2 = dict(climax_k=CLIMAX_K, follow_g=FOLLOW_G, follow_n=FOLLOW_N, release_k=RELEASE_K,
+                retest_frac=RETEST_FRAC, retest_k=RETEST_K, retest_min=RETEST_MIN,
+                fold_atr=FOLD_ATR, fold_ratio=FOLD_RATIO, fold_tol=FOLD_TOL, shift=True)
+RULES_V1 = dict(climax_k=0.0, follow_g=0.0, follow_n=0, release_k=0.0, retest_frac=0.0, retest_k=0.0,
+                retest_min=0.0, fold_atr=0.0, fold_ratio=0.0, fold_tol=0.0, shift=False)
+
+
+def ledger(o, h, l, c, eff, rules: dict | None = None) -> SwingResult:
+    """Swing ledger. v2 rules (default) on top of v1:
+      anchor   a climactic SBar (TR ≥ CLIMAX_K × ATR[1], the turning bar included) keeps the reference;
+               smaller follow-through SBars right after it do not move it
+      release  while anchored, an opposite SBar that closes ≥ RELEASE_K × ATR[1] from the extreme turns the swing
+      retest   a swing of ≥ RETEST_MIN ATR that is run back ≥ RETEST_FRAC of the way, closing ≥ RETEST_K ATR
+               from its extreme, has ended (double bottom / top)
+      shift    a swing never trades beyond its own start: if it does (other than on its last bar), the turn moves there
+      fold     at each confirmation, A(d) B(−d) C(d) become one swing when C goes beyond A, B holds A's start
+               (± FOLD_TOL ATR), and B < FOLD_ATR × ATR and < FOLD_RATIO × C (smallest first, repeated)
+    """
+    R = dict(RULES_V2 if rules is None else rules)
     h, l, c, e = (np.asarray(x, float) for x in (h, l, c, eff))
     n = len(c)
     sb = sbars(o, h, l, c)
@@ -196,12 +221,226 @@ def ledger(o, h, l, c, eff) -> SwingResult:
     pc = np.r_[np.nan, c[:-1]]
     trlo = np.where(np.isnan(pc), l, np.minimum(l, pc))
     trhi = np.where(np.isnan(pc), h, np.maximum(h, pc))
+    tr = trhi - trlo
     rbar = np.zeros(n, int)
-    res = SwingResult(rbar=rbar, sbar=sb, tl=np.zeros(n, int), seq=np.zeros(n, int))
+    res = SwingResult(rbar=rbar, sbar=sb, tl=np.zeros(n, int), seq=np.zeros(n, int), done_ext=np.full(n, np.nan))
     st = {"dir": 0, "stage": 0, "k": -10**9}      # sequence state: red direction, stage (1 red, 2 green), swing no.
     start = next((i for i in range(n) if not np.isnan(atr1[i])), None)
     if start is None or start + 1 >= n:
         return res
+    SW = res.swings
+    climax_k, follow_g, follow_n = R["climax_k"], R["follow_g"], R["follow_n"]
+
+    def with_dir(k, d):
+        return (d == 1 and sb[k] > 0) or (d == -1 and sb[k] < 0)
+
+    def take(k, d, ref, ref_tr, ref_bar, has_sb):
+        """SBar at k in the swing direction becomes the reference, unless a climactic bar holds it and this is
+        a much smaller follow-through bar shortly after."""
+        pair = sb[k] in (2, -2)
+        k_tr = (max(trhi[k], trhi[k - 1]) - min(trlo[k], trlo[k - 1])) if pair else tr[k]
+        if (follow_g and has_sb and k - ref_bar <= follow_n and k_tr < follow_g * ref_tr
+                and ref_tr >= climax_k * atr1[ref_bar]):
+            return ref, ref_tr, ref_bar
+        if pair:                                  # combo: reference = the pair's true range
+            return (min(trlo[k], trlo[k - 1]) if d == 1 else max(trhi[k], trhi[k - 1])), k_tr, k
+        return (trlo[k] if d == 1 else trhi[k]), k_tr, k
+
+    def stats(j):
+        """(Re)compute swing j's numbers from its start/end and the previous same-direction swing."""
+        sw = SW[j]
+        seg = e[sw.start_i + 1:sw.end_i + 1]
+        seg = seg[~np.isnan(seg)]
+        sw.extent_pct = (sw.end_p / sw.start_p - 1) * 100
+        sw.bars = sw.end_i - sw.start_i
+        sw.avg_effort = float(seg.mean()) if len(seg) else np.nan
+        prev = SW[j - 2] if j >= 2 else None
+        sw.r_vs_prev = sw.e_vs_prev = np.nan
+        if prev is not None:
+            sw.r_vs_prev = abs(sw.extent_pct) / abs(prev.extent_pct) if prev.extent_pct else np.nan
+            sw.e_vs_prev = sw.avg_effort / prev.avg_effort if prev.avg_effort else np.nan
+
+    def shift_last():
+        """The last swing never trades beyond its own start (its own last bar excepted)."""
+        if not R["shift"] or len(SW) < 2:
+            return
+        C, P = SW[-1], SW[-2]
+        lo, hi = C.start_i + 1, C.end_i - 1
+        if hi < lo:
+            return
+        if C.direction == 1:
+            k = lo + int(np.argmin(l[lo:hi + 1]))
+            beyond, p = l[k] < C.start_p, l[k]
+        else:
+            k = lo + int(np.argmax(h[lo:hi + 1]))
+            beyond, p = h[k] > C.start_p, h[k]
+        if beyond:
+            P.end_i = C.start_i = k
+            P.end_p = C.start_p = p
+            stats(len(SW) - 2)
+            stats(len(SW) - 1)
+
+    def fold_once():
+        """Fold the smallest qualifying counter-swing among the last three swings ending at the newest one."""
+        if not R["fold_atr"] or len(SW) < 3:
+            return False
+        A, B, C = SW[-3], SW[-2], SW[-1]
+        d = A.direction
+        if not ((C.end_p > A.end_p) if d == 1 else (C.end_p < A.end_p)):
+            return False
+        a = atr[B.start_i]
+        tol = R["fold_tol"] * a
+        if not ((B.end_p >= A.start_p - tol) if d == 1 else (B.end_p <= A.start_p + tol)):
+            return False
+        eb, ec = abs(B.end_p - B.start_p), abs(C.end_p - C.start_p)
+        if not (eb < R["fold_atr"] * a and eb < R["fold_ratio"] * ec):
+            return False
+        A.end_i, A.end_p, A.confirm_i = C.end_i, C.end_p, C.confirm_i
+        del SW[-2:]
+        stats(len(SW) - 1)
+        return True
+
+    d = 1 if c[start + 1] >= c[start] else -1
+    s_i, s_p = start, (l[start] if d == 1 else h[start])
+    x_i = start                                   # extreme bar of the current swing
+    ref = trlo[start] if d == 1 else trhi[start]  # reversal reference
+    has_sb = False
+    ref_tr, ref_bar = 0.0, -10**9                 # true range / bar of the SBar holding the reference
+    count = 0
+    for i in range(start + 1, n):
+        # 1) does this bar extend the current swing?
+        if (d == 1 and h[i] > h[x_i]) or (d == -1 and l[i] < l[x_i]):
+            x_i = i
+            if not has_sb:
+                ref = trlo[i] if d == 1 else trhi[i]
+        # 2) a significant bar in the swing direction moves the reference
+        if with_dir(i, d):
+            ref, ref_tr, ref_bar = take(i, d, ref, ref_tr, ref_bar, has_sb)
+            has_sb = True
+        # 3) reversal bar?
+        if i > x_i and not np.isnan(atr1[i]):
+            ext = h[x_i] if d == 1 else l[x_i]
+            travel = (ext - l[i]) if d == 1 else (h[i] - ext)
+            broke = c[i] < ref if d == 1 else c[i] > ref
+            away = (ext - c[i]) if d == 1 else (c[i] - ext)
+            size = abs(ext - s_p)
+            retest = (R["retest_frac"] and size >= R["retest_min"] * atr1[i] and travel >= R["retest_frac"] * size
+                      and away >= R["retest_k"] * atr1[i])
+            anchored = has_sb and ref_bar >= 0 and ref_tr >= climax_k * atr1[ref_bar]
+            release = R["release_k"] and anchored and with_dir(i, -d) and away >= R["release_k"] * atr1[i]
+            if (broke and travel >= TRAVEL_K * atr1[i]) or retest or release:
+                count += 1
+                SW.append(Swing(n=count, direction=d, start_i=s_i, start_p=s_p, end_i=x_i, end_p=ext, confirm_i=i,
+                                extent_pct=0.0, bars=0, avg_effort=np.nan))
+                stats(len(SW) - 1)
+                shift_last()
+                while fold_once():
+                    shift_last()
+                sw = SW[-1]
+                count = sw.n
+                classify(sw, st)
+                res.tl[i], res.seq[i] = sw.tl, sw.seq
+                res.done_ext[i] = sw.extent_pct
+                rbar[i] = -d
+                # new swing in the opposite direction starts at the old extreme
+                d = -d
+                s_i, s_p = x_i, ext
+                seg_i = range(x_i + 1, i + 1)
+                x_i = (min(seg_i, key=lambda k: l[k]) if d == -1 else max(seg_i, key=lambda k: h[k]))
+                has_sb = False
+                ref_tr, ref_bar = 0.0, -10**9
+                ref = trlo[x_i] if d == 1 else trhi[x_i]
+                wide = follow_g and tr[s_i] >= climax_k * atr1[s_i]   # the turning bar itself is climactic
+                for k in [s_i, *seg_i] if wide else seg_i:          # SBars already printed in the new direction
+                    if with_dir(k, d):
+                        ref, ref_tr, ref_bar = take(k, d, ref, ref_tr, ref_bar, has_sb)
+                        has_sb = True
+    return res
+
+    def with_dir(k, d):
+        return (d == 1 and sb[k] > 0) or (d == -1 and sb[k] < 0)
+
+    def take(k, d, ref, ref_tr, ref_bar, has_sb):
+        """SBar at k in the swing direction becomes the reference, unless it is a small follow-through bar
+        shortly after a much wider one (then the wide bar keeps the anchor)."""
+        pair = sb[k] in (2, -2)
+        k_tr = (max(trhi[k], trhi[k - 1]) - min(trlo[k], trlo[k - 1])) if pair else tr[k]
+        if (anchor_g and has_sb and k - ref_bar <= anchor_n and k_tr < anchor_g * ref_tr
+                and ref_tr >= anchor_c * atr1[ref_bar]):
+            return ref, ref_tr, ref_bar
+        if pair:                                  # combo: reference = the pair's true range
+            return (min(trlo[k], trlo[k - 1]) if d == 1 else max(trhi[k], trhi[k - 1])), k_tr, k
+        return (trlo[k] if d == 1 else trhi[k]), k_tr, k
+
+    d = 1 if c[start + 1] >= c[start] else -1
+    s_i, s_p = start, (l[start] if d == 1 else h[start])
+    x_i = start                                   # extreme bar of the current swing
+    ref = trlo[start] if d == 1 else trhi[start]  # reversal reference
+    has_sb = False
+    ref_tr, ref_bar = 0.0, -10**9                 # true range / bar of the SBar holding the reference
+    last = {1: None, -1: None}
+    count = 0
+    snap = None                                   # state just before the last confirmation (to undo a failed turn)
+    for i in range(start + 1, n):
+        # 0) failed turn: the new swing trades beyond its own start -> the old swing never ended
+        if undo_failed and snap is not None and ((d == 1 and l[i] < s_p) or (d == -1 and h[i] > s_p)):
+            (st, last, count, ref, ref_tr, ref_bar, has_sb, s_i, s_p, x_i, d, j) = snap
+            st, last = dict(st), dict(last)
+            res.swings.pop()
+            rbar[j] = 0
+            res.tl[j] = res.seq[j] = 0
+            snap = None
+        # 1) does this bar extend the current swing?
+        if (d == 1 and h[i] > h[x_i]) or (d == -1 and l[i] < l[x_i]):
+            x_i = i
+            if not has_sb:
+                ref = trlo[i] if d == 1 else trhi[i]
+        # 2) a significant bar in the swing direction moves the reference
+        if with_dir(i, d):
+            ref, ref_tr, ref_bar = take(i, d, ref, ref_tr, ref_bar, has_sb)
+            has_sb = True
+        # 3) reversal bar?
+        if i > x_i and not np.isnan(atr1[i]):
+            ext = h[x_i] if d == 1 else l[x_i]
+            travel = (ext - l[i]) if d == 1 else (h[i] - ext)
+            broke = c[i] < ref if d == 1 else c[i] > ref
+            tc = (ext - c[i]) if d == 1 else (c[i] - ext)
+            # deep retest: the bar runs back to (nearly) the swing start and closes well away from the extreme
+            deep = (deep_frac and travel >= deep_frac * abs(ext - s_p) and tc >= deep_k * atr1[i]
+                    and abs(ext - s_p) >= deep_min * atr1[i])
+            anchored = has_sb and ref_bar >= 0 and ref_tr >= anchor_c * atr1[ref_bar]
+            opp = opp_k and with_dir(i, -d) and tc >= opp_k * atr1[i] and (anchored or not opp_anchored)
+            if (broke and travel >= TRAVEL_K * atr1[i]) or deep or opp:
+                snap = (dict(st), dict(last), count, ref, ref_tr, ref_bar, has_sb, s_i, s_p, x_i, d, i)
+                count += 1
+                seg = e[s_i + 1:x_i + 1]
+                seg = seg[~np.isnan(seg)]
+                sw = Swing(n=count, direction=d, start_i=s_i, start_p=s_p, end_i=x_i, end_p=ext, confirm_i=i,
+                           extent_pct=(ext / s_p - 1) * 100, bars=x_i - s_i,
+                           avg_effort=float(seg.mean()) if len(seg) else np.nan)
+                prev = last[d]
+                if prev is not None:
+                    sw.r_vs_prev = abs(sw.extent_pct) / abs(prev.extent_pct) if prev.extent_pct else np.nan
+                    sw.e_vs_prev = sw.avg_effort / prev.avg_effort if prev.avg_effort else np.nan
+                last[d] = sw
+                classify(sw, st)
+                res.tl[i], res.seq[i] = sw.tl, sw.seq
+                res.swings.append(sw)
+                rbar[i] = -d
+                # new swing in the opposite direction starts at the old extreme
+                d = -d
+                s_i, s_p = x_i, ext
+                seg_i = range(x_i + 1, i + 1)
+                x_i = (min(seg_i, key=lambda k: l[k]) if d == -1 else max(seg_i, key=lambda k: h[k]))
+                has_sb = False
+                ref_tr, ref_bar = 0.0, -10**9
+                ref = trlo[x_i] if d == 1 else trhi[x_i]
+                wide = anchor_g and tr[s_i] >= anchor_c * atr1[s_i]   # the turning bar itself is a climactic bar
+                for k in [s_i, *seg_i] if wide else seg_i:   # SBars already printed in the new direction
+                    if with_dir(k, d):
+                        ref, ref_tr, ref_bar = take(k, d, ref, ref_tr, ref_bar, has_sb)
+                        has_sb = True
+    return res
     d = 1 if c[start + 1] >= c[start] else -1
     s_i, s_p = start, (l[start] if d == 1 else h[start])
     x_i = start                                   # extreme bar of the current swing
@@ -209,7 +448,16 @@ def ledger(o, h, l, c, eff) -> SwingResult:
     has_sb = False
     last = {1: None, -1: None}
     count = 0
+    snap = None                                   # state just before the last confirmation (to undo a failed turn)
     for i in range(start + 1, n):
+        # 0) failed turn: the new swing trades beyond its own start -> the old swing never ended
+        if undo_failed and snap is not None and ((d == 1 and l[i] < s_p) or (d == -1 and h[i] > s_p)):
+            (st, last, count, ref, ref_tr, ref_bar, has_sb, s_i, s_p, x_i, d, j) = snap
+            st, last = dict(st), dict(last)
+            res.swings.pop()
+            rbar[j] = 0
+            res.tl[j] = res.seq[j] = 0
+            snap = None
         # 1) does this bar extend the current swing?
         if (d == 1 and h[i] > h[x_i]) or (d == -1 and l[i] < l[x_i]):
             x_i = i

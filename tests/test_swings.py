@@ -83,3 +83,69 @@ def test_bar_traffic_light_sequence():
     tl, seq = swings.bar_traffic_light(h, l, c, e)
     assert list(tl[-3:]) == [swings.TL_RED, swings.TL_GREEN, swings.TL_BLUE]
     assert seq[-1] == -1
+
+
+def _walk(n=4000, seed=7):
+    rng = np.random.default_rng(seed)
+    c = 100 + np.cumsum(rng.standard_t(3, n) * 0.1)
+    o = np.r_[c[0], c[:-1]]
+    w = np.abs(rng.normal(0, 0.06, n))
+    return o, np.maximum(o, c) + w, np.minimum(o, c) - w, c
+
+
+def test_v2_ledger_invariants_on_a_random_walk():
+    o, h, l, c = _walk()
+    r = swings.ledger(o, h, l, c, np.ones(len(c)))
+    S = r.swings
+    assert len(S) > 50
+    for a, b in zip(S, S[1:]):
+        assert a.direction != b.direction                       # directions alternate
+        assert a.end_i == b.start_i and a.end_p == b.start_p    # each swing starts where the last one ended
+    for s in S:
+        assert s.confirm_i > s.start_i       # (a shifted turn can move a swing's end past its live RBar)
+        seg_h, seg_l = h[s.start_i + 1:s.end_i + 1], l[s.start_i + 1:s.end_i + 1]   # the turning bar itself excluded
+        if s.direction == 1:
+            assert s.end_p == seg_h.max()                       # ends at its highest high
+            assert l[s.start_i + 1:s.end_i].min(initial=np.inf) >= s.start_p   # never trades below its start
+        else:
+            assert s.end_p == seg_l.min()
+            assert h[s.start_i + 1:s.end_i].max(initial=-np.inf) <= s.start_p
+
+
+def test_v1_rules_remain_available():
+    o, h, l, c = _walk()
+    v1 = swings.ledger(o, h, l, c, np.ones(len(c)), rules=swings.RULES_V1).swings
+    v2 = swings.ledger(o, h, l, c, np.ones(len(c))).swings
+    assert v1 and v2 and [(s.start_i, s.end_i) for s in v1] != [(s.start_i, s.end_i) for s in v2]
+
+
+def test_climactic_bar_keeps_the_reference():
+    # quiet drift down, one climactic up bar (≈13 × ATR), a small follow-through SBar, a dip that closes below
+    # the follow-through low but far above the climactic low, then a new high.
+    c = list(100 - np.arange(30) * 0.03)
+    o = [c[0]] + c[:-1]
+    h = [max(a, b) + 0.08 for a, b in zip(o, c)]
+    l = [min(a, b) - 0.08 for a, b in zip(o, c)]
+    base = c[-1]
+    k = len(c)
+    rows = [(base, base + 1.7, base - 0.1, base + 1.6),         # climactic bar
+            (base + 1.6, base + 2.1, base + 1.5, base + 2.05),  # follow-through SBar (much smaller)
+            (base + 2.05, base + 2.07, base + 1.35, base + 1.4),  # dip closes below the follow-through low
+            (base + 1.4, base + 1.5, base + 1.25, base + 1.3),
+            (base + 1.3, base + 1.65, base + 1.28, base + 1.6),
+            (base + 1.6, base + 2.0, base + 1.55, base + 1.95),
+            (base + 1.95, base + 2.5, base + 1.9, base + 2.45),
+            (base + 2.45, base + 3.0, base + 2.4, base + 2.95),
+            (base + 2.95, base + 3.0, base + 2.2, base + 2.25),   # turn down
+            (base + 2.25, base + 2.3, base + 1.6, base + 1.65),
+            (base + 1.65, base + 1.7, base + 1.0, base + 1.05)]
+    for r in rows:
+        o.append(r[0]); h.append(r[1]); l.append(r[2]); c.append(r[3])
+    o, h, l, c = (np.array(x) for x in (o, h, l, c))
+    sb = swings.sbars(o, h, l, c)
+    assert sb[k] == 1 and sb[k + 1] == 1
+    ups = lambda rules: [s for s in swings.ledger(o, h, l, c, np.ones(len(c)), rules=rules).swings
+                         if s.direction == 1 and s.start_i == k]
+    v1, v2 = ups(swings.RULES_V1), ups(None)
+    assert v1 and v1[0].end_i == k + 1                          # v1: the dip ended the swing at the follow-through
+    assert v2 and v2[0].end_i == k + 7                          # v2: one swing from the climactic low to the top
