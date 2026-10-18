@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, health, telegram
+from whs import bars, health, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -87,7 +87,21 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
     summary = dict(run_utc=now.isoformat(), run_local=health.local_str(now), backfill=backfill,
                    problems=problems, symbols=report)
     (DATA / "health.json").write_text(json.dumps(summary, indent=1, default=str))
+    write_snapshot(summary, now)
     return summary
+
+
+def write_snapshot(summary: dict, now) -> None:
+    """Market snapshot for Pipdon BOT's commands (data/snapshot.json)."""
+    try:
+        h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
+        h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
+        sp = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in SPOT}
+        snap = snapshot.build({k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)},
+                              {k: v for k, v in sp.items() if len(v)}, summary, now)
+        (DATA / "snapshot.json").write_text(json.dumps(snap, separators=(",", ":"), default=str))
+    except Exception as e:   # the snapshot must never break data collection
+        print(f"[snapshot error] {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":

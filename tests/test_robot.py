@@ -121,6 +121,11 @@ def test_run_end_to_end(tmp_path, monkeypatch):
     assert s["symbols"]["XAUUSD"]["status"] == "unavailable"
     assert any("Data healthy" in m for m in sent)                  # daily OK line after 08:00 local
     assert (tmp_path / "data" / "bars" / "4h" / "6E.csv").exists()
+    snap = json.loads((tmp_path / "data" / "snapshot.json").read_text())
+    e = snap["instruments"]["6E"]
+    assert e["available"] and e["price"] == pytest.approx(e["last"]["close"]) and e["atr_1h"] > 0
+    assert e["mt5"]["symbol"] == "EURUSD" and snap["strength"]["1d"][0]["ccy"]
+    assert abs(sum(c["strength_pct"] for c in snap["strength"]["1d"])) < 1e-6   # strengths sum to zero
 
     # one feed goes stale three hours later -> exactly one alert, not repeated
     later = now + pd.Timedelta(hours=3)
