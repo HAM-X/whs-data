@@ -22,9 +22,11 @@ Events   (accumulation names; distribution in brackets)
   UA          [UT] in phase B, price trades above the creek and closes back below within BACK_BARS bars
   LPS [LPSY]  no spring: when the SOS prints, the pullback low it rose from (lowest low since the last up swing's
               top) if that is a higher low than the ST in the lower half of the range — known only in hindsight
-  SOS [SOW]   a close beyond the creek; confirmed when price holds beyond it (no close back below
-              creek − HOLD_TOL·H) for HOLD_BARS bars, failed if it closes back below that line first
-  BU          a pullback swing between the SOS and leaving the range that held the creek (when one exists)
+  SOS [SOW]   a close beyond the resistance cluster (the highest high of A+B, UA and failed SOS highs included).
+              Confirmed by a back-up (a pullback swing holding creek − HOLD_TOL·H) or by running LEAVE_H·H clear;
+              failed by a close below creek − HOLD_TOL·H first — then it goes back to the phase it came from
+  BU / LPS    the first pullback after the SOS that holds the creek is the BU; every later higher-low pullback in D is an LPS
+  LPS (C)     after the gate, a test below support that holds above the B lows (Roman's HD 1990: higher-low phase C)
   UA needs price to fall back into the range (≥ UA_DROP·H below the creek) before any SOS; else it was the SOS start
 Phases   A  SC → the first ST · B  building cause → C  spring / test / LPS → D  SOS → E  price leaves the range
          (≥ LEAVE_H × H beyond the creek). Without a spring or LPS, B runs straight into D.
@@ -40,7 +42,7 @@ from . import core, swings
 ST_ZONE, ST_EFFORT, BREAK_TOL = 0.35, 0.8, 0.15
 BACK_BARS, SPRING3_ATR, SPRING3_EFF = 3, 1.0, 1.1
 LPS_ZONE = 0.5
-HOLD_TOL, HOLD_BARS, LEAVE_H = 0.2, 6, 0.5
+HOLD_TOL, LEAVE_H = 0.2, 0.5
 UA_DROP = 0.25
 AR_MAX = 2.0          # phase A: an AR that runs past 2 × the first range height means no range formed
 B_MIN, B_ROUND = 1.0, 0.5   # phase C needs a mature phase B: as long as phase A, with a rally into the upper half
@@ -124,9 +126,11 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
     rallied = False                                     # phase B has rallied into the upper half
     pen_gate = False
     labelled = set()                                    # bars already named by a break (no double ST)
+    last_brk = None                                     # (bar, low) of the last labelled phase-B break
     spring = lps = sos = None
-    sos_hold = 0
-    bu = None
+    pre_d = "B"                                         # the phase an SOS came from (a failed SOS goes back there)
+    cl_hi, cl_upto = np.nan, None                       # resistance cluster: highest high of A+B up to the last pullback
+    d_low = np.nan                                      # last phase-D pullback low (LPS chain)
     by_bar = {}                                         # reversal bar → the swing finished on it (mirrored)
     for (dd, si, sp, ei, ep, ci) in led.done:
         by_bar[ci] = (dd * k_, si, sp * k_, ei, ep * k_)
@@ -157,6 +161,11 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                 end = i
                 live[i] = "ABCDE".index(phase) + 1
                 break
+        # phase B maturity: phase C may start only after B has lasted as long as A and rallied into the upper half
+        if phase == "B" and b_start is not None and h[i] >= S + B_ROUND * H and i > b_start:
+            rallied = True
+        gate = phase == "B" and b_start is not None and rallied and (i - b_start) >= B_MIN * (b_start - a1)
+        floor = S if np.isnan(low_b) else min(S, low_b)    # Phase C tests the lows of A AND B
         # the swing finished on this bar (if any)
         sw = by_bar.get(i)
         if sw is not None and sw[0] == 1 and phase == "E":
@@ -168,7 +177,14 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
         if sw is not None and sw[0] == -1 and sw[1] >= a2_click and sw[3] > a2:
             kk, p = sw[3], sw[4]
             e_k = _effort_at(eff, kk, i)
-            if (phase in ("A", "B") and spring is None and lps is None and kk not in labelled
+            if phase == "B" and gate and spring is None and lps is None and kk not in labelled and floor <= p < S:
+                # phase C without a new low: a test below support that holds above the B lows (HD 1990)
+                spring = add("LPS", kk, p, "candidate", i, "phase C: a test below support that held above the B lows")
+                labelled.add(kk)
+                phases[-1][2] = kk
+                phases.append(["C", kk, None])
+                phase = "C"
+            elif (phase in ("A", "B") and spring is None and lps is None and kk not in labelled
                     and S - BREAK_TOL * H <= p <= S + ST_ZONE * H):
                 e_sc = _effort_at(eff, a1, i)
                 less = not np.isnan(e_k) and not np.isnan(e_sc) and e_k <= ST_EFFORT * e_sc
@@ -182,16 +198,26 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                     phase = "B"
                     b_start = kk
                 st_low = p if np.isnan(st_low) else min(st_low, p)
-            elif spring is not None and spring.state == "candidate" and p > spring.price and kk > spring.bar:
-                add("Test", kk, p, "confirmed", i, "holds a higher low than the spring")
+            elif phase == "C" and spring is not None and spring.state != "failed" and p > spring.price and kk > spring.bar \
+                    and (np.isnan(d_low) or p > d_low):
+                is_lps = spring.name == names["LPS"]
+                add("LPS" if is_lps else "Test", kk, p, "confirmed", i,
+                    "higher low after the phase-C low" if is_lps else "holds a higher low than the spring")
                 spring.state = "confirmed"
-            elif phase == "D" and sos is not None and kk > sos.bar and p >= R - HOLD_TOL * H:
-                bu = (kk, p, i)
-        # phase B maturity: phase C may start only after B has lasted as long as A and rallied into the upper half
-        if phase == "B" and b_start is not None and h[i] >= S + B_ROUND * H and i > b_start:
-            rallied = True
-        gate = phase == "B" and b_start is not None and rallied and (i - b_start) >= B_MIN * (b_start - a1)
-        floor = S if np.isnan(low_b) else min(S, low_b)    # Phase C tests the lows of A AND B
+                d_low = p
+            elif phase == "D" and sos is not None and kk > sos.bar and p >= R - HOLD_TOL * H \
+                    and (np.isnan(d_low) or p > d_low):
+                first = sos.state == "candidate"
+                add("BU" if first else "LPS", kk, p, "confirmed", i,
+                    "back-up to the creek held: the SOS is confirmed" if first else "higher low in phase D")
+                sos.state = "confirmed"
+                d_low = p
+            if phase in ("A", "B", "C"):                # the A+B highs up to this pullback form the resistance cluster
+                j0 = a1 if cl_upto is None else cl_upto + 1
+                if kk >= j0:
+                    m = h[j0:kk + 1].max()
+                    cl_hi = m if np.isnan(cl_hi) else max(cl_hi, m)
+                    cl_upto = kk
         # a trade below support: in an immature B it is an ST (or ST as SOW); after the gate it is the spring
         if phase == "B" and spring is None and pen is None and l[i] < (floor if gate else S):
             pen, pen_gate = i, gate
@@ -201,8 +227,12 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
             loud = not np.isnan(e_k) and e_k >= SOW_EFF                 # above-average effort at the low
             heavy = loud or bool((sbm[pen:i + 1] < 0).any())             # ...or a wide down bar (SOW character)
             back = c[i] >= (floor if pen_gate else S)
-            if back and not pen_gate:
+            if back and not pen_gate and last_brk is not None and low_k - last_brk[0] <= BACK_BARS_B \
+                    and l[low_k] >= last_brk[1]:
+                pen = None                              # the same break, re-poking: no new label
+            elif back and not pen_gate:
                 key = "mSOW" if heavy else "ST"
+                last_brk = (low_k, l[low_k])
                 add(key, low_k, l[low_k], "confirmed", i,
                     "phase B: ST as SOW — supply still present, not the spring" if heavy else
                     "phase B: ST below the SC low, back inside")
@@ -246,7 +276,8 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                 add("UA", ua_wait, h[ua_wait], "confirmed", i, "trade beyond the range edge fell back inside")
                 ua_wait = None
         # SOS: a close beyond the creek
-        if sos is None and c[i] > R and phase in ("B", "C"):
+        cluster = R if np.isnan(cl_hi) else max(R, cl_hi)
+        if sos is None and c[i] > cluster and phase in ("B", "C"):
             ua_wait = None
             up = None
             # LPS (no spring): the pullback low this SOS rose from — a higher low than the ST in the lower half
@@ -258,27 +289,26 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                     lps = add("LPS", kk, l[kk], "confirmed", i, "higher low than the ST; the SOS rose from it")
                     phases[-1][2] = kk
                     phases.append(["C", kk, None])
-            sos = add("SOS", i, c[i], "candidate", i, "close beyond the range edge")
-            sos_hold = 0
-            bu = None
+                    phase = "C"
+            if spring is not None and spring.state == "candidate":
+                spring.state = "confirmed"              # the SOS rose from it
+            sos = add("SOS", i, c[i], "candidate", i, "close beyond the A+B highs")
+            d_low = np.nan
+            pre_d = phase
             phases[-1][2] = i
             phases.append(["D", i, None])
             phase = "D"
         elif sos is not None and sos.state == "candidate":
             if c[i] < R - HOLD_TOL * H:
                 sos.state = "failed"
-                sos.note = "closed back inside the range"
+                sos.note = "closed back inside the range before any back-up held"
                 phases[-1][2] = i
-                phases.append(["B", i, None])
-                phase = "B"
+                phases.append([pre_d, i, None])
+                phase = pre_d
                 sos = None
-            else:
-                sos_hold += 1
-                if sos_hold >= HOLD_BARS:
-                    sos.state = "confirmed"
+            elif h[i] >= R + LEAVE_H * H:
+                sos.state = "confirmed"                 # ran clear of the range without coming back
         if phase == "D" and sos is not None and sos.state == "confirmed" and h[i] >= R + LEAVE_H * H:
-            if bu is not None:
-                add("BU", bu[0], bu[1], "confirmed", bu[2], "back-up held the range edge")
             phases[-1][2] = i
             phases.append(["E", i, None])
             phase = "E"
