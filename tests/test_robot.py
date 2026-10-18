@@ -125,7 +125,7 @@ def test_run_end_to_end(tmp_path, monkeypatch):
     e = snap["instruments"]["6E"]
     assert e["available"] and e["price"] == pytest.approx(e["last"]["close"]) and e["atr_1h"] > 0
     assert e["mt5"]["symbol"] == "EURUSD" and snap["strength"]["1d"][0]["ccy"]
-    assert abs(sum(c["strength_pct"] for c in snap["strength"]["1d"])) < 1e-6   # strengths sum to zero
+    assert abs(sum(c["strength_pct"] for c in snap["strength"]["1d"])) < 0.005   # strengths sum to zero (each is rounded to 0.001)
 
     # one feed goes stale three hours later -> exactly one alert, not repeated
     later = now + pd.Timedelta(hours=3)
