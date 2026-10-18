@@ -30,27 +30,37 @@ def test_eurusd_q1_2025_accumulation():
     a1 = lab.index("2025-01-13 10:00")
     a2 = lab.index("2025-01-27 14:00")
     r = _read(d, eff, a1, a2)
-    assert r.kind == "accumulation"
+    assert r.kind == "SC" and r.outcome == 1 and r.name == "Accumulation"
     names = {e.name: e for e in r.events}
     assert names["SOS"].state == "confirmed" and names["LPS"].state == "confirmed"
-    assert [e.name for e in r.events] == ["SC", "AR", "ST", "ST", "LPS", "SOS"]
     assert [p[0] for p in r.phases] == ["A", "B", "C", "D", "E"]
+    assert "SOS confirmed" in r.bull and not any("SOW" in x for x in r.bear)
     assert lab[names["SOS"].bar].startswith("2025-03-0")
     edges, prof, poc = r.profile
     assert prof.sum() > 0 and edges[0] <= r.support and edges[-1] >= r.support
 
 
 def test_distribution_is_accumulation_mirrored():
+    # the same bars upside down: a BC-type range that resolves down, with the same phase-C/D story on the top side
     d, lab, eff = _load()
     a1, a2 = lab.index("2025-01-13 10:00"), lab.index("2025-01-27 14:00")
     acc = _read(d, eff, a1, a2)
     dist = _read(d, eff, a1, a2, sign=-1)
-    assert dist.kind == "distribution"
-    m = dict(zip(ranges.NAMES_ACC.values(), ranges.NAMES_DIST.values()))
-    assert [(m[e.name.split(" ")[0]], e.bar, e.state) for e in acc.events] == \
-           [(e.name.split(" ")[0], e.bar, e.state) for e in dist.events]
+    assert dist.kind == "BC" and dist.outcome == -1 and dist.name == "Distribution"
+    key = lambda r, side: [(e.role, e.bar, e.state) for e in r.events if e.side == side and e.role not in ("ST", "B_light")]
+    assert key(acc, 1) == key(dist, -1)
     assert [p[:2] for p in acc.phases] == [p[:2] for p in dist.phases]
     assert np.isclose(dist.support, -acc.resistance) and np.isclose(dist.resistance, -acc.support)
+
+
+def test_names_follow_the_higher_timeframe():
+    d, lab, eff = _load()
+    a1, a2 = lab.index("2025-01-13 10:00"), lab.index("2025-01-27 14:00")
+    o, h, l, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+    up = ranges.read(o, h, l, c, eff, d.volume.to_numpy(float), a1, a2, htf=1)
+    assert up.name == "Re-accumulation" and up.bear_name == "Distribution"
+    dn = ranges.read(-o, -l, -h, -c, eff, d.volume.to_numpy(float), a1, a2, htf=-1)
+    assert dn.name == "Redistribution" and dn.bull_name == "Accumulation"
 
 
 def test_no_range_when_the_reaction_keeps_going():
@@ -61,7 +71,7 @@ def test_no_range_when_the_reaction_keeps_going():
     a1 = int(np.argmin(l[:45]))
     r = ranges.read(o, h, l, c, np.ones(len(c)), np.ones(len(c)), a1, 49)
     ar = next(e for e in r.events if e.name == "AR")
-    assert ar.state == "failed" and r.phases == [("A", a1, r.phases[0][2])]
+    assert ar.state == "failed" and [p[0] for p in r.phases] == ["A"] and r.outcome == 0
 
 
 def _early_break_range():
