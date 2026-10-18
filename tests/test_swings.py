@@ -71,3 +71,15 @@ def test_tag_format():
     s = swings.Swing(n=9, direction=1, start_i=0, start_p=1.0, end_i=13, end_p=1.0111, confirm_i=15,
                      extent_pct=1.11, bars=13, avg_effort=1.4, r_vs_prev=1.2, e_vs_prev=1.2)
     assert s.tag() == "↑9 +1.11% 13b 1.4× R> D>"
+
+
+def test_bar_traffic_light_sequence():
+    # flat history, then: up bar stopping (more effort, less result) → down bar sync → down bar ease
+    c = [100.0, 100.5, 100.0, 100.5, 100.0, 100.5, 100.0] * 3
+    h = [x + 0.5 for x in c]; l = [x - 0.5 for x in c]
+    e = [1.0] * len(c)
+    c += [100.5, 99.5, 98.1]; h += [100.6, 100.5, 99.5]; l += [100.2, 99.2, 98.0]
+    e += [2.0, 2.2, 0.8]
+    tl, seq = swings.bar_traffic_light(h, l, c, e)
+    assert list(tl[-3:]) == [swings.TL_RED, swings.TL_GREEN, swings.TL_BLUE]
+    assert seq[-1] == -1

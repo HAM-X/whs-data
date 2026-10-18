@@ -70,9 +70,12 @@ def main(path: str, tf: int, root: str | None = None) -> int:
         py_e = core.effort(veff, t, tf)
         pine_e = col(d, "Effort").to_numpy()
         sb_py = swings.sbars(o, h, l, c)
+        tl_py, seq_py = swings.bar_traffic_light(h, l, c, pine_e)          # same effort input as Pine
         exact = lambda name, a, b: dict(value=name, compared=len(a), mismatches=int((np.asarray(a) != np.asarray(b)).sum()),
                                          worst=0.0, na_disagree=0)
         rows.append(exact("R1 SBar", sb_py[warm:], col(d, "R1 SBar").to_numpy()[warm:].astype(int)))
+        rows.append(exact("R1 traffic light", tl_py[warm:], col(d, "R1 traffic light").to_numpy()[warm:].astype(int)))
+        rows.append(exact("R1 TL sequence", seq_py[warm + 50:], col(d, "R1 TL sequence").to_numpy()[warm + 50:].astype(int)))
         # swings: Pine started on older history, so compare after the first reversal both agree on
         led = swings.ledger(o, h, l, c, pine_e)
         rb_py, rb_pine = led.rbar, col(d, "R1 RBar").to_numpy().astype(int)
@@ -89,7 +92,7 @@ def main(path: str, tf: int, root: str | None = None) -> int:
                        and led.swings[j - 2].confirm_i > k0), k0)
             rows.append(exact("R1 swing TL", led.tl[k1:], col(d, "R1 swing TL").to_numpy()[k1:].astype(int)))
             k2 = next((sw.confirm_i for j, sw in enumerate(led.swings) if j >= 8 and led.swings[j - 8].confirm_i > k0), k1)
-            rows.append(exact("R1 TL sequence", led.seq[k2:], col(d, "R1 TL sequence").to_numpy()[k2:].astype(int)))
+            rows.append(exact("R1 swing TL sequence", led.seq[k2:], col(d, "R1 swing TL sequence").to_numpy()[k2:].astype(int)))
             rows.append(dict(value="(swings compared)", compared=int((rb_pine[k0:] != 0).sum()), mismatches=0,
                              worst=0.0, na_disagree=0))
         _ = py_e

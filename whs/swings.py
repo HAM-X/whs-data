@@ -72,6 +72,58 @@ def sbars(o, h, l, c):
     return out
 
 
+BAR_WINDOW = 10
+
+
+def bar_traffic_light(h, l, c, eff):
+    """Per-bar traffic light, Roman's deltas applied bar by bar.
+
+    Each bar (direction = close vs previous close) is compared with the previous bar in the SAME
+    direction: dE = effort ratio, dR = result ratio (result = TR ÷ ATR[1]).
+      RED    stop     dE ≥ 1.1 and dR ≤ 0.9
+      GREEN  sync     dE ≥ 1.1 and dR ≥ 1.1
+      ease            dE ≤ 0.9 and dR ≥ 1.1 → ORANGE in the old direction while a RED is live, else BLUE
+    Sequence RED (d) → GREEN (−d) within 10 bars → BLUE (−d) within 10 bars = ±(−d) on that BLUE bar.
+    Returns (tl, seq) arrays."""
+    h, l, c, e = (np.asarray(x, float) for x in (h, l, c, eff))
+    rs = core.true_range(h, l, c) / np.r_[np.nan, core.atr(h, l, c)[:-1]]
+    n = len(c)
+    tl, seq = np.zeros(n, int), np.zeros(n, int)
+    prev = {1: None, -1: None}
+    red_dir, red_i, green_i, stage = 0, -10**9, -10**9, 0
+    for i in range(1, n):
+        if stage == 1 and i - red_i > BAR_WINDOW:
+            stage, red_dir = 0, 0
+        if stage == 2 and i - green_i > BAR_WINDOW:
+            stage, red_dir = 0, 0
+        if np.isnan(e[i]) or np.isnan(rs[i]) or c[i] == c[i - 1]:
+            continue
+        d = 1 if c[i] > c[i - 1] else -1
+        p = prev[d]
+        prev[d] = (e[i], rs[i])
+        if p is None or p[0] <= 0 or p[1] <= 0:
+            continue
+        dE, dR = e[i] / p[0], rs[i] / p[1]
+        if dE >= E_UP and dR <= R_DN:
+            tl[i] = TL_RED
+            red_dir, red_i, stage = d, i, 1
+        elif dE >= E_UP and dR >= R_UP:
+            tl[i] = TL_GREEN
+            if stage == 1 and d == -red_dir:
+                stage, green_i = 2, i
+            elif stage >= 1 and d == red_dir:
+                stage, red_dir = 0, 0
+        elif dE <= E_DN and dR >= R_UP:
+            if stage == 1 and d == red_dir:
+                tl[i] = TL_ORANGE
+            else:
+                tl[i] = TL_BLUE
+                if stage == 2 and d == -red_dir:
+                    seq[i] = d
+                    stage, red_dir = 0, 0
+    return tl, seq
+
+
 @dataclass
 class Swing:
     n: int
