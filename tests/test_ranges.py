@@ -62,3 +62,39 @@ def test_no_range_when_the_reaction_keeps_going():
     r = ranges.read(o, h, l, c, np.ones(len(c)), np.ones(len(c)), a1, 49)
     ar = next(e for e in r.events if e.name == "AR")
     assert ar.state == "failed" and r.phases == [("A", a1, r.phases[0][2])]
+
+
+def _early_break_range():
+    seg=lambda a,b,n: list(np.linspace(a,b,n+1))[1:]
+    c=[120.0]+seg(120,100,30)
+    c+= [99.2]                         # SC close (bar a1)
+    a1=len(c)-1
+    c+=seg(99.2,105.5,8); a2=len(c)-1  # AR
+    c+=seg(105.5,99.6,6)               # ST
+    c+=seg(99.6,103.5,5)               # rally that turns the ST swing
+    c+=seg(103.5,98.6,4)               # drop into the break
+    brk=len(c); c+=[97.4]              # heavy break bar
+    c+=seg(97.4,99.0,2)                # back inside
+    c+=seg(99.0,104.5,8)               # rally into the upper half
+    c+=seg(104.5,100.5,6); c+=seg(100.5,104.0,6); c+=seg(104.0,98.2,7)
+    spr=len(c); c+=[97.2]              # dip under the A+B lows (96.9?) -> see lows below
+    c+=seg(97.2,99.5,2); c+=seg(99.5,106.8,10); c+=seg(106.8,110,8); c+=seg(110,108,4)
+    c=np.array(c); o=np.r_[c[0],c[:-1]]
+    h=np.maximum(o,c)+0.35; l=np.minimum(o,c)-0.35
+    l[a1]=98.0; h[a1]=100.6
+    l[brk]=96.8; l[spr]=96.55; h[spr]=max(h[spr],97.6)
+    eff=np.ones(len(c)); eff[a1]=2.4; eff[a1+1]=1.5; eff[brk]=2.6; eff[spr]=0.8; eff[spr+1]=0.9
+    return o,h,l,c,eff,a1,a2,brk,spr
+
+
+def test_early_phase_b_break_is_st_as_sow_not_the_spring():
+    # Roman (HD 1990): a break below support EARLY in phase B on rising effort is "ST as SOW" — still phase B.
+    # Phase C comes only after a mature B (as long as A, with a rally into the upper half) and tests the A+B lows.
+    o, h, l, c, eff, a1, a2, brk, spr = _early_break_range()
+    r = ranges.read(o, h, l, c, eff, np.ones(len(c)), a1, a2)
+    ev = {e.bar: e for e in r.events}
+    assert ev[brk].name == "mSOW" and ev[brk].state == "confirmed"
+    assert ev[spr].name.startswith("Spring")
+    starts = {p[0]: p[1] for p in r.phases}
+    assert starts["B"] < brk < starts["C"] == spr
+    assert [p[0] for p in r.phases] == ["A", "B", "C", "D", "E"]

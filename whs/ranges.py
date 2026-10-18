@@ -10,7 +10,12 @@ Events   (accumulation names; distribution in brackets)
   AR          the second anchor (confirmed by the trader)
   ST          a down swing after AR ending in the lower ST_ZONE of the range (not below support − BREAK_TOL·H).
               Less effort than SC → confirmed (and the SC with it); more effort → candidate, a later ST may confirm
-  Spring [UTAD]  price trades below support and closes back inside within BACK_BARS bars.
+  ST / mSOW   [ST / mSOS] in an immature phase B a trade below support that returns inside within 6 bars is an ST
+              in B — or, on effort ≥ 1.5 or with a down SBar, an "ST as SOW" (minor SOW). It stays phase B and
+              lowers the floor phase C must test (the lows of A AND B). No return → breakdown.
+  Gate        phase C needs a mature B: B as long as A, and a rally into the upper half of the range since B began
+  Spring [UTAD]  after the gate, price trades below the A+B lows and closes back above them within BACK_BARS bars.
+              Effort ≥ 1.5 at the low = Shakeout, candidate until a test holds a higher low.
               #3 = shallow (≤ SPRING3_ATR) on ordinary effort (≤ SPRING3_EFF): confirmed at once.
               #2 = deeper or heavier: candidate until a test holds a higher low, then confirmed.
               failed = a close below the spring low (or no return inside → breakdown).
@@ -38,10 +43,14 @@ LPS_ZONE = 0.5
 HOLD_TOL, HOLD_BARS, LEAVE_H = 0.2, 6, 0.5
 UA_DROP = 0.25
 AR_MAX = 2.0          # phase A: an AR that runs past 2 × the first range height means no range formed
+B_MIN, B_ROUND = 1.0, 0.5   # phase C needs a mature phase B: as long as phase A, with a rally into the upper half
+SOW_EFF, BACK_BARS_B = 1.5, 6   # a phase-B break on effort ≥ 1.5 or a down SBar = ST as SOW; it gets 6 bars to return
 
 NAMES_ACC = {"SC": "SC", "AR": "AR", "ST": "ST", "Spring": "Spring", "UA": "UA", "LPS": "LPS", "SOS": "SOS",
+             "mSOW": "mSOW", "Shakeout": "Shakeout",
              "BU": "BU", "Test": "Test"}
 NAMES_DIST = {"SC": "BC", "AR": "AR", "ST": "ST", "Spring": "UTAD", "UA": "UT", "LPS": "LPSY", "SOS": "SOW",
+              "mSOW": "mSOS", "Shakeout": "UTAD",
               "BU": "BU", "Test": "Test"}
 
 
@@ -82,6 +91,7 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
     the same walk the Pine range section makes."""
     o, h, l, c, eff, vol = (np.asarray(x, float) for x in (o, h, l, c, eff, vol))
     led = swings.ledger(o, h, l, c, eff)                # swings on the real prices; mirrored below
+    sb_real = swings.sbars(o, h, l, c)
     if kind is None:                                   # SC low under the AR high → accumulation
         kind = "accumulation" if l[a1] <= l[a2] and h[a2] >= h[a1] else "distribution"
     acc = kind == "accumulation"
@@ -89,6 +99,7 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
     if not acc:                                        # mirror: distribution read as accumulation of −price
         o, h, l, c = -o, -l, -h, -c
     names = NAMES_ACC if acc else NAMES_DIST
+    sbm = sb_real * k_                                  # SBars in the mirrored frame (negative = down)
     n = len(c)
     atr = core.atr(h, l, c)
     S = l[a1]
@@ -108,6 +119,11 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
     phases = [["A", a1, None]]
     phase = "A"
     st_low = np.nan
+    low_b = np.nan                                      # lowest low of phase-B breaks below support
+    b_start = None
+    rallied = False                                     # phase B has rallied into the upper half
+    pen_gate = False
+    labelled = set()                                    # bars already named by a break (no double ST)
     spring = lps = sos = None
     sos_hold = 0
     bu = None
@@ -152,7 +168,8 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
         if sw is not None and sw[0] == -1 and sw[1] >= a2_click and sw[3] > a2:
             kk, p = sw[3], sw[4]
             e_k = _effort_at(eff, kk, i)
-            if phase in ("A", "B") and spring is None and lps is None and S - BREAK_TOL * H <= p <= S + ST_ZONE * H:
+            if (phase in ("A", "B") and spring is None and lps is None and kk not in labelled
+                    and S - BREAK_TOL * H <= p <= S + ST_ZONE * H):
                 e_sc = _effort_at(eff, a1, i)
                 less = not np.isnan(e_k) and not np.isnan(e_sc) and e_k <= ST_EFFORT * e_sc
                 add("ST", kk, p, "confirmed" if less else "candidate", i,
@@ -163,30 +180,52 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                     phases[-1][2] = kk
                     phases.append(["B", kk, None])
                     phase = "B"
+                    b_start = kk
                 st_low = p if np.isnan(st_low) else min(st_low, p)
             elif spring is not None and spring.state == "candidate" and p > spring.price and kk > spring.bar:
                 add("Test", kk, p, "confirmed", i, "holds a higher low than the spring")
                 spring.state = "confirmed"
             elif phase == "D" and sos is not None and kk > sos.bar and p >= R - HOLD_TOL * H:
                 bu = (kk, p, i)
-        # spring: a trade below support after the ST
-        if phase == "B" and spring is None and pen is None and l[i] < S:
-            pen = i
+        # phase B maturity: phase C may start only after B has lasted as long as A and rallied into the upper half
+        if phase == "B" and b_start is not None and h[i] >= S + B_ROUND * H and i > b_start:
+            rallied = True
+        gate = phase == "B" and b_start is not None and rallied and (i - b_start) >= B_MIN * (b_start - a1)
+        floor = S if np.isnan(low_b) else min(S, low_b)    # Phase C tests the lows of A AND B
+        # a trade below support: in an immature B it is an ST (or ST as SOW); after the gate it is the spring
+        if phase == "B" and spring is None and pen is None and l[i] < (floor if gate else S):
+            pen, pen_gate = i, gate
         if pen is not None and spring is None:
             low_k = pen + int(np.argmin(l[pen:i + 1]))
-            if c[i] >= S:
-                depth = S - l[low_k]
-                e_k = _effort_at(eff, low_k, i)
+            e_k = _effort_at(eff, low_k, i)
+            loud = not np.isnan(e_k) and e_k >= SOW_EFF                 # above-average effort at the low
+            heavy = loud or bool((sbm[pen:i + 1] < 0).any())             # ...or a wide down bar (SOW character)
+            back = c[i] >= (floor if pen_gate else S)
+            if back and not pen_gate:
+                key = "mSOW" if heavy else "ST"
+                add(key, low_k, l[low_k], "confirmed", i,
+                    "phase B: ST as SOW — supply still present, not the spring" if heavy else
+                    "phase B: ST below the SC low, back inside")
+                labelled.add(low_k)
+                low_b = l[low_k] if np.isnan(low_b) else min(low_b, l[low_k])
+                pen = None
+            elif back:
+                depth = floor - l[low_k]
                 shallow = depth <= SPRING3_ATR * atr[low_k] and (np.isnan(e_k) or e_k <= SPRING3_EFF)
-                spring = add("Spring", low_k, l[low_k], "confirmed" if shallow else "candidate", i,
-                             "#3 shallow, ordinary effort" if shallow else "#2 needs a test that holds a higher low")
-                spring.name += " #3" if shallow else " #2"
+                if loud:
+                    spring = add("Shakeout", low_k, l[low_k], "candidate", i,
+                                 "heavy effort below the A+B lows, back inside — needs a test that holds a higher low")
+                else:
+                    spring = add("Spring", low_k, l[low_k], "confirmed" if shallow else "candidate", i,
+                                 "#3 shallow, ordinary effort" if shallow else "#2 needs a test that holds a higher low")
+                    spring.name += " #3" if shallow else " #2"
+                labelled.add(low_k)
                 phases[-1][2] = low_k
                 phases.append(["C", low_k, None])
                 phase = "C"
                 pen = None
-            elif i - pen >= BACK_BARS:
-                add("Spring", low_k, l[low_k], "failed", i, "no return inside: breakdown")
+            elif i - pen >= (BACK_BARS if pen_gate else BACK_BARS_B):
+                add("Spring" if pen_gate else "mSOW", low_k, l[low_k], "failed", i, "no return inside: breakdown")
                 end = i
                 live[i] = "ABCDE".index(phase) + 1
                 break
@@ -214,7 +253,8 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
             if phase == "B" and spring is None and not np.isnan(st_low):
                 j0 = max(last_up_end, a2) + 1
                 kk = j0 + int(np.argmin(l[j0:i + 1]))
-                if st_low < l[kk] <= S + LPS_ZONE * H:
+                fl = st_low if np.isnan(low_b) else min(st_low, low_b)
+                if fl < l[kk] <= S + LPS_ZONE * H:
                     lps = add("LPS", kk, l[kk], "confirmed", i, "higher low than the ST; the SOS rose from it")
                     phases[-1][2] = kk
                     phases.append(["C", kk, None])
