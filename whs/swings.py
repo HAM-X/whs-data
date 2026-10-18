@@ -157,6 +157,7 @@ class SwingResult:
     tl: np.ndarray = None         # swing traffic light, written on the RBar that confirmed the swing
     seq: np.ndarray = None        # ±1 on the RBar of the BLUE swing that completes a sequence
     done_ext: np.ndarray = None   # extent % of the swing as finished on that RBar (after shift/fold) — what Pine prints
+    done: list = field(default_factory=list)   # (dir, start_i, start_p, end_i, end_p, confirm bar) as known on each RBar
 
 
 def classify(sw: "Swing", st: dict) -> None:
@@ -341,6 +342,7 @@ def ledger(o, h, l, c, eff, rules: dict | None = None) -> SwingResult:
                 classify(sw, st)
                 res.tl[i], res.seq[i] = sw.tl, sw.seq
                 res.done_ext[i] = sw.extent_pct
+                res.done.append((sw.direction, sw.start_i, sw.start_p, sw.end_i, sw.end_p, i))
                 rbar[i] = -d
                 # new swing in the opposite direction starts at the old extreme
                 d = -d

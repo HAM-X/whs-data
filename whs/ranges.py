@@ -15,8 +15,8 @@ Events   (accumulation names; distribution in brackets)
               #2 = deeper or heavier: candidate until a test holds a higher low, then confirmed.
               failed = a close below the spring low (or no return inside → breakdown).
   UA          [UT] in phase B, price trades above the creek and closes back below within BACK_BARS bars
-  LPS [LPSY]  no spring yet: a down swing in phase B that holds a higher low than the ST in the lower half.
-              candidate → confirmed when an SOS follows without breaking it; failed if a close below it
+  LPS [LPSY]  no spring: when the SOS prints, the pullback low it rose from (lowest low since the last up swing's
+              top) if that is a higher low than the ST in the lower half of the range — known only in hindsight
   SOS [SOW]   a close beyond the creek; confirmed when price holds beyond it (no close back below
               creek − HOLD_TOL·H) for HOLD_BARS bars, failed if it closes back below that line first
   BU          a pullback swing between the SOS and leaving the range that held the creek (when one exists)
@@ -67,28 +67,35 @@ class RangeRead:
     phases: list = field(default_factory=list)   # (letter, start bar, end bar)
     profile: tuple = None           # (row edges, volume per row, poc row)
     end: int = 0                    # last bar of the range read
+    live: np.ndarray = None         # phase as known on each bar: 0 none · 1 A … 5 E (what Pine exports)
 
 
-def _effort_at(eff, k):
-    vals = [eff[j] for j in (k, k + 1) if 0 <= j < len(eff) and not np.isnan(eff[j])]
+def _effort_at(eff, k, upto=None):
+    """Effort at an event: the larger of its bar and the next one (only bars known by `upto`)."""
+    top = len(eff) - 1 if upto is None else upto
+    vals = [eff[j] for j in (k, k + 1) if 0 <= j <= top and not np.isnan(eff[j])]
     return max(vals) if vals else np.nan
 
 
 def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profile_rows: int = 24) -> RangeRead:
+    """Bar by bar, using only what was known on each bar (swings as finished on their reversal bar) —
+    the same walk the Pine range section makes."""
     o, h, l, c, eff, vol = (np.asarray(x, float) for x in (o, h, l, c, eff, vol))
+    led = swings.ledger(o, h, l, c, eff)                # swings on the real prices; mirrored below
     if kind is None:                                   # SC low under the AR high → accumulation
         kind = "accumulation" if l[a1] <= l[a2] and h[a2] >= h[a1] else "distribution"
     acc = kind == "accumulation"
+    k_ = 1 if acc else -1
     if not acc:                                        # mirror: distribution read as accumulation of −price
         o, h, l, c = -o, -l, -h, -c
     names = NAMES_ACC if acc else NAMES_DIST
     n = len(c)
     atr = core.atr(h, l, c)
     S = l[a1]
+    b2 = a2                                             # the second click; the walk starts after it
     a2 = a1 + int(np.argmax(h[a1:a2 + 1]))             # AR = highest high up to the second click
     R = h[a2]
     H = R - S
-    led = swings.ledger(o, h, l, c, eff)
     ev = []
 
     def add(key, bar, price, state, known, note=""):
@@ -100,59 +107,68 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
     ar = add("AR", a2, R, "confirmed", a2)
     phases = [["A", a1, None]]
     phase = "A"
-    st_eff, st_low = np.nan, np.nan
+    st_low = np.nan
     spring = lps = sos = None
     sos_hold = 0
-    done_swings = sorted((s for s in led.swings if s.start_i >= a2), key=lambda s: s.confirm_i)
-    sw_k = 0
-    out_i = n - 1
-    i = a2 + 1
+    bu = None
+    by_bar = {}                                         # reversal bar → the swing finished on it (mirrored)
+    for (dd, si, sp, ei, ep, ci) in led.done:
+        by_bar[ci] = (dd * k_, si, sp * k_, ei, ep * k_)
+    end = n - 1
     pen = None                                          # first bar of a penetration below support
     up = None                                           # first bar above the creek (phase B)
     ua_wait = None                                      # UA high waiting for price to fall back into the range
     H0 = H
-    while i < n:
+    a2_click = a2
+    last_up_end = a2
+    live = np.zeros(n, int)
+    live[b2] = 1
+    for i in range(b2 + 1, n):
+        live[i] = "ABCDE".index(phase) + 1
         # phase A: the reaction may still be running (AR extends) — or the trend simply resumes (no range)
         if phase == "A":
             if h[i] > R:
                 if h[i] - S > AR_MAX * H0:
                     ar.state, ar.note = "failed", "the reaction kept going: no range, the trend turned"
                     sc.state = "failed"
-                    out_i = i
+                    end = i
+                    live[i] = "ABCDE".index(phase) + 1
                     break
                 R, a2, H = h[i], i, h[i] - S
                 ar.bar, ar.price, ar.effort, ar.note = i, R, _effort_at(eff, i), "extended past the second click"
             if c[i] < S - BREAK_TOL * H:
                 sc.state, sc.note = "failed", "closed back beyond the SC: the trend resumed"
-                out_i = i
+                end = i
+                live[i] = "ABCDE".index(phase) + 1
                 break
-        # swings that became known on this bar
-        while sw_k < len(done_swings) and done_swings[sw_k].confirm_i <= i:
-            s = done_swings[sw_k]
-            sw_k += 1
-            if s.direction != -1 or s.end_i <= a2:
-                continue
-            k, p = s.end_i, s.end_p
-            e_k = _effort_at(eff, k)
-            if phase in ("A", "B") and spring is None and S - BREAK_TOL * H <= p <= S + ST_ZONE * H and lps is None:
-                less = not np.isnan(e_k) and not np.isnan(sc.effort) and e_k <= ST_EFFORT * sc.effort
-                st = add("ST", k, p, "confirmed" if less else "candidate", i,
-                         "on less effort than the SC" if less else "on more effort than the SC")
+        # the swing finished on this bar (if any)
+        sw = by_bar.get(i)
+        if sw is not None and sw[0] == 1 and phase == "E":
+            end = sw[3]                                 # the swing that left the range is over: the read ends
+            live[i] = "ABCDE".index(phase) + 1
+            break
+        if sw is not None and sw[0] == 1:
+            last_up_end = sw[3]
+        if sw is not None and sw[0] == -1 and sw[1] >= a2_click and sw[3] > a2:
+            kk, p = sw[3], sw[4]
+            e_k = _effort_at(eff, kk, i)
+            if phase in ("A", "B") and spring is None and lps is None and S - BREAK_TOL * H <= p <= S + ST_ZONE * H:
+                e_sc = _effort_at(eff, a1, i)
+                less = not np.isnan(e_k) and not np.isnan(e_sc) and e_k <= ST_EFFORT * e_sc
+                add("ST", kk, p, "confirmed" if less else "candidate", i,
+                    "on less effort than the SC" if less else "on more effort than the SC")
                 if less and sc.state == "candidate":
                     sc.state = "confirmed"
                 if phase == "A":
-                    phases[-1][2] = k
-                    phases.append(["B", k, None])
+                    phases[-1][2] = kk
+                    phases.append(["B", kk, None])
                     phase = "B"
-                st_eff = e_k if np.isnan(st_eff) else min(st_eff, e_k)
                 st_low = p if np.isnan(st_low) else min(st_low, p)
-            elif phase == "B" and spring is None and not np.isnan(st_low) and st_low < p <= S + LPS_ZONE * H and k > a2:
-                if lps is not None and lps.state == "candidate":
-                    lps.state = "failed" if p < lps.price else lps.state
-                lps = add("LPS", k, p, "candidate", i, "higher low than the ST, before any spring")
-            elif spring is not None and spring.state == "candidate" and p > spring.price and k > spring.bar:
-                add("Test", k, p, "confirmed", i, "holds a higher low than the spring")
+            elif spring is not None and spring.state == "candidate" and p > spring.price and kk > spring.bar:
+                add("Test", kk, p, "confirmed", i, "holds a higher low than the spring")
                 spring.state = "confirmed"
+            elif phase == "D" and sos is not None and kk > sos.bar and p >= R - HOLD_TOL * H:
+                bu = (kk, p, i)
         # spring: a trade below support after the ST
         if phase == "B" and spring is None and pen is None and l[i] < S:
             pen = i
@@ -160,7 +176,7 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
             low_k = pen + int(np.argmin(l[pen:i + 1]))
             if c[i] >= S:
                 depth = S - l[low_k]
-                e_k = _effort_at(eff, low_k)
+                e_k = _effort_at(eff, low_k, i)
                 shallow = depth <= SPRING3_ATR * atr[low_k] and (np.isnan(e_k) or e_k <= SPRING3_EFF)
                 spring = add("Spring", low_k, l[low_k], "confirmed" if shallow else "candidate", i,
                              "#3 shallow, ordinary effort" if shallow else "#2 needs a test that holds a higher low")
@@ -171,20 +187,19 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                 pen = None
             elif i - pen >= BACK_BARS:
                 add("Spring", low_k, l[low_k], "failed", i, "no return inside: breakdown")
-                out_i = i
+                end = i
+                live[i] = "ABCDE".index(phase) + 1
                 break
         if spring is not None and spring.state != "failed" and c[i] < spring.price:
             spring.state = "failed"
             spring.note = "closed below the spring low"
-        if lps is not None and lps.state == "candidate" and c[i] < lps.price:
-            lps.state = "failed"
         # UA: a phase-B trade above the creek that closes back inside, then falls back into the range
         if phase == "B" and sos is None:
             if h[i] > R and up is None and ua_wait is None:
                 up = i
             if up is not None:
                 if c[i] > R:
-                    up = None                                  # closed above: the SOS rule takes it
+                    up = None                           # closed above: the SOS rule takes it
                 elif c[i] < R:
                     ua_wait = up + int(np.argmax(h[up:i + 1]))
                     up = None
@@ -194,12 +209,18 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
         # SOS: a close beyond the creek
         if sos is None and c[i] > R and phase in ("B", "C"):
             ua_wait = None
+            up = None
+            # LPS (no spring): the pullback low this SOS rose from — a higher low than the ST in the lower half
+            if phase == "B" and spring is None and not np.isnan(st_low):
+                j0 = max(last_up_end, a2) + 1
+                kk = j0 + int(np.argmin(l[j0:i + 1]))
+                if st_low < l[kk] <= S + LPS_ZONE * H:
+                    lps = add("LPS", kk, l[kk], "confirmed", i, "higher low than the ST; the SOS rose from it")
+                    phases[-1][2] = kk
+                    phases.append(["C", kk, None])
             sos = add("SOS", i, c[i], "candidate", i, "close beyond the range edge")
             sos_hold = 0
-            if lps is not None and lps.state == "candidate":
-                lps.state = "confirmed"
-                phases[-1][2] = lps.bar
-                phases.append(["C", lps.bar, None])
+            bu = None
             phases[-1][2] = i
             phases.append(["D", i, None])
             phase = "D"
@@ -215,25 +236,17 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
                 sos_hold += 1
                 if sos_hold >= HOLD_BARS:
                     sos.state = "confirmed"
-        if phase == "D" and h[i] >= R + LEAVE_H * H and sos is not None and sos.state == "confirmed":
+        if phase == "D" and sos is not None and sos.state == "confirmed" and h[i] >= R + LEAVE_H * H:
+            if bu is not None:
+                add("BU", bu[0], bu[1], "confirmed", bu[2], "back-up held the range edge")
             phases[-1][2] = i
             phases.append(["E", i, None])
             phase = "E"
-            out_i = i
-            # BU: a pullback swing between the SOS and leaving the range that held the creek
-            bu = next((s for s in done_swings if s.direction == -1 and sos.bar < s.end_i <= i
-                       and s.end_p >= R - HOLD_TOL * H), None)
-            if bu is not None:
-                add("BU", bu.end_i, bu.end_p, "confirmed", bu.confirm_i, "back-up held the range edge")
-            break
-        i += 1
-    end = out_i if phase == "E" else min(i, n - 1)
-    # phase E runs to the end of the swing that left the range (or the last bar)
-    leave = next((s for s in led.swings if s.start_i <= end <= s.end_i and s.direction == 1), None)
-    phases[-1][2] = (leave.end_i if leave is not None else n - 1) if phase == "E" else end
-    # range volume profile: the cause built inside the range, SC → the SOS (or the end of the read)
+        live[i] = "ABCDE".index(phase) + 1
+    phases[-1][2] = end
+    # range volume profile: the cause built inside the range, SC → the bar before the SOS (or the end of the read)
     # raw volume (contracts traded at each price), spread evenly across each bar's high–low
-    p_end = next((e.bar for e in ev if e.name == names["SOS"] and e.state != "failed"), end) - 1
+    p_end = next((e.bar for e in ev if e.name == names["SOS"] and e.state != "failed"), end + 1) - 1
     lo_p, hi_p = l[a1:p_end + 1].min(), h[a1:p_end + 1].max()
     edges = np.linspace(lo_p, hi_p, profile_rows + 1)
     prof = np.zeros(profile_rows)
@@ -248,6 +261,7 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, kind: str | None = None, profil
             e.price = -e.price
         edges = -edges[::-1]
         prof = prof[::-1]
-    rr = RangeRead(kind, a1, a2, min(S, R), max(S, R), ev, [tuple(p) for p in phases],
-                   (edges, prof, int(np.argmax(prof))), end)
-    return rr
+    for e in ev:                                       # shown effort: full information
+        e.effort = _effort_at(eff, e.bar)
+    return RangeRead(kind, a1, a2, min(S, R), max(S, R), ev, [tuple(p) for p in phases],
+                     (edges, prof, int(np.argmax(prof))), end, live)
