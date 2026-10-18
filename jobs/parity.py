@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from whs import core
+from whs import core, swings
 
 TOL = 1e-9
 
@@ -65,11 +65,38 @@ def main(path: str, tf: int, root: str | None = None) -> int:
         got = col(d, "Core in roll").to_numpy()
         rows.append(dict(value=f"Roll window ({root})", compared=len(d), mismatches=int((exp != got).sum()),
                          worst=float(np.abs(exp - got).max()), na_disagree=0))
+    if any(c.strip() == "R1 SBar" for c in d.columns):
+        o = col(d, "open")
+        py_e = core.effort(veff, t, tf)
+        pine_e = col(d, "Effort").to_numpy()
+        sb_py = swings.sbars(o, h, l, c)
+        tl_py, tdir_py = swings.traffic_light(h, l, c, pine_e)      # same effort input as Pine
+        seq_py = swings.tl_sequences(tl_py, tdir_py)
+        exact = lambda name, a, b: dict(value=name, compared=len(a), mismatches=int((np.asarray(a) != np.asarray(b)).sum()),
+                                         worst=0.0, na_disagree=0)
+        rows.append(exact("R1 SBar", sb_py[warm:], col(d, "R1 SBar").to_numpy()[warm:].astype(int)))
+        rows.append(exact("R1 traffic light", tl_py[warm:], col(d, "R1 traffic light").to_numpy()[warm:].astype(int)))
+        seq_from = warm + 50                                               # sequence state settles
+        rows.append(exact("R1 TL sequence", seq_py[seq_from:], col(d, "R1 TL sequence").to_numpy()[seq_from:].astype(int)))
+        # swings: Pine started on older history, so compare after the first reversal both agree on
+        led = swings.ledger(o, h, l, c, pine_e)
+        rb_py, rb_pine = led.rbar, col(d, "R1 RBar").to_numpy().astype(int)
+        common = [i for i in range(warm, len(d)) if rb_py[i] != 0 and rb_py[i] == rb_pine[i]]
+        if common:
+            k0 = common[0]
+            rows.append(exact("R1 RBar (after sync)", rb_py[k0:], rb_pine[k0:]))
+            ext_py = np.full(len(d), np.nan)
+            for sw in led.swings:
+                ext_py[sw.confirm_i] = sw.extent_pct
+            rows.append(compare(col(d, "R1 swing extent").iloc[k0 + 1:], ext_py[k0 + 1:], "R1 swing extent"))
+            rows.append(dict(value="(swings compared)", compared=int((rb_pine[k0:] != 0).sum()), mismatches=0,
+                             worst=0.0, na_disagree=0))
+        _ = py_e
     rep = pd.DataFrame(rows)
     print(rep.to_string(index=False))
     print(f"\nbars {len(d)} (first {warm} = warm-up, not compared) · roll-window bars {roll_bars} · first {t.iloc[0]} · last {t.iloc[-1]}")
     ok = (rep["mismatches"] == 0).all() and (rep["na_disagree"] == 0).all()
-    print("R0 PARITY:", "PASS" if ok else "FAIL")
+    print("PARITY:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 
