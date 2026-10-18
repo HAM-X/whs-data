@@ -47,7 +47,7 @@ jobs:
 
       - name: Test the bot
         if: steps.check.outputs.skip != 'true'
-        run: node --test bot/
+        run: node --test bot/worker.test.mjs
 
       - name: Deploy to Cloudflare
         if: steps.check.outputs.skip != 'true'
