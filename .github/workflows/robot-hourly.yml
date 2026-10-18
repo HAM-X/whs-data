@@ -1,0 +1,76 @@
+name: robot-hourly
+
+# Pipdon BOT data robot. Runs 12 minutes past every hour, Sunday to Friday (UTC).
+# Your time is UTC+3, so it runs at hh:12 all day. Saturday is skipped (CME closed).
+on:
+  schedule:
+    - cron: "12 * * * 0-5"
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: "Download Yahoo's full ~2 years of 1h history"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: robot-data
+  cancel-in-progress: false
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Download, store, check health
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ github.event.inputs.backfill }}" = "true" ]; then
+            python -m jobs.download --backfill
+          else
+            python -m jobs.download
+          fi
+
+      - name: Save data to the repository
+        run: |
+          git config user.name "pipdon-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No new bars."
+            exit 0
+          fi
+          git commit -q -m "data: $(TZ=Africa/Nairobi date '+%a %d %b %H:%M') UTC+3"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "::error::Could not push data after 3 tries"
+          exit 1
+
+      - name: Tell Hamza if the job itself crashed
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          [ -z "$TOKEN" ] && exit 0
+          curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=Pipdon BOT · ❌ robot-hourly crashed. Log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > /dev/null
