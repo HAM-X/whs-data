@@ -19,23 +19,37 @@ def test_sbar_needs_size_close_half_and_breakout():
     assert sb[-1] == 1 and (sb[:-1] == 0).all()
 
 
-def test_tl_sequence_red_green_blue():
-    tl = np.array([0, 1, 0, 2, 3, 0, 4, 0])
-    td = np.array([0, -1, 0, 1, 1, 0, 1, 0])
-    seq = swings.tl_sequences(tl, td)
-    assert seq[6] == 1 and seq.sum() == 1
+def mk(n, d, dE, dR):
+    s = swings.Swing(n=n, direction=d, start_i=0, start_p=1, end_i=1, end_p=1, confirm_i=2, extent_pct=1, bars=1,
+                     avg_effort=1, r_vs_prev=dR, e_vs_prev=dE)
+    return s
+
+
+def run(seq):
+    st = {"dir": 0, "stage": 0, "k": -10**9}
+    out = []
+    for s in seq:
+        swings.classify(s, st)
+        out.append((s.tl, s.seq))
+    return out
+
+
+def test_tl_top_sequence_red_orange_green_blue():
+    # rally stops (RED up) → lower-high attempt on less effort (ORANGE up) → decline expands (GREEN down) → eases (BLUE down)
+    out = run([mk(1, 1, 1.6, 0.6), mk(2, -1, 1.0, 1.0), mk(3, 1, 0.8, 1.2), mk(4, -1, 1.5, 1.6),
+               mk(5, 1, 1.0, 1.0), mk(6, -1, 0.7, 1.3)])
+    assert [o[0] for o in out] == [swings.TL_RED, 0, swings.TL_ORANGE, swings.TL_GREEN, 0, swings.TL_BLUE]
+    assert out[-1][1] == -1 and sum(o[1] for o in out) == -1
 
 
 def test_tl_red_alone_is_not_a_reversal():
-    tl = np.array([0, 1, 0, 4, 0, 4])
-    td = np.array([0, -1, 0, 1, 0, 1])
-    assert (swings.tl_sequences(tl, td) == 0).all()
+    out = run([mk(1, 1, 1.6, 0.6), mk(2, -1, 0.7, 1.3), mk(3, 1, 1.0, 1.0)])
+    assert all(o[1] == 0 for o in out)
 
 
-def test_tl_opposite_green_breaks_sequence():
-    tl = np.array([1, 3, 3, 4])
-    td = np.array([-1, 1, -1, 1])
-    assert (swings.tl_sequences(tl, td) == 0).all()
+def test_tl_green_back_in_old_direction_cancels():
+    out = run([mk(1, 1, 1.6, 0.6), mk(2, -1, 1.5, 1.5), mk(3, 1, 1.5, 1.5), mk(4, -1, 0.7, 1.3)])
+    assert all(o[1] == 0 for o in out)
 
 
 def test_ledger_zigzag_alternates_and_confirms_late():

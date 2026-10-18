@@ -70,14 +70,9 @@ def main(path: str, tf: int, root: str | None = None) -> int:
         py_e = core.effort(veff, t, tf)
         pine_e = col(d, "Effort").to_numpy()
         sb_py = swings.sbars(o, h, l, c)
-        tl_py, tdir_py = swings.traffic_light(h, l, c, pine_e)      # same effort input as Pine
-        seq_py = swings.tl_sequences(tl_py, tdir_py)
         exact = lambda name, a, b: dict(value=name, compared=len(a), mismatches=int((np.asarray(a) != np.asarray(b)).sum()),
                                          worst=0.0, na_disagree=0)
         rows.append(exact("R1 SBar", sb_py[warm:], col(d, "R1 SBar").to_numpy()[warm:].astype(int)))
-        rows.append(exact("R1 traffic light", tl_py[warm:], col(d, "R1 traffic light").to_numpy()[warm:].astype(int)))
-        seq_from = warm + 50                                               # sequence state settles
-        rows.append(exact("R1 TL sequence", seq_py[seq_from:], col(d, "R1 TL sequence").to_numpy()[seq_from:].astype(int)))
         # swings: Pine started on older history, so compare after the first reversal both agree on
         led = swings.ledger(o, h, l, c, pine_e)
         rb_py, rb_pine = led.rbar, col(d, "R1 RBar").to_numpy().astype(int)
@@ -89,6 +84,12 @@ def main(path: str, tf: int, root: str | None = None) -> int:
             for sw in led.swings:
                 ext_py[sw.confirm_i] = sw.extent_pct
             rows.append(compare(col(d, "R1 swing extent").iloc[k0 + 1:], ext_py[k0 + 1:], "R1 swing extent"))
+            # swing traffic light needs two same-direction swings of shared history, sequences up to 6 more
+            k1 = next((led.swings[j].confirm_i for j, sw in enumerate(led.swings) if sw.confirm_i > k0 and j >= 2
+                       and led.swings[j - 2].confirm_i > k0), k0)
+            rows.append(exact("R1 swing TL", led.tl[k1:], col(d, "R1 swing TL").to_numpy()[k1:].astype(int)))
+            k2 = next((sw.confirm_i for j, sw in enumerate(led.swings) if j >= 8 and led.swings[j - 8].confirm_i > k0), k1)
+            rows.append(exact("R1 TL sequence", led.seq[k2:], col(d, "R1 TL sequence").to_numpy()[k2:].astype(int)))
             rows.append(dict(value="(swings compared)", compared=int((rb_pine[k0:] != 0).sum()), mismatches=0,
                              worst=0.0, na_disagree=0))
         _ = py_e

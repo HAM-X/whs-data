@@ -10,14 +10,15 @@ Definitions (Stack v2 Core contract + WTC Part 2):
                  has none yet, the low of the extreme bar. That confirming bar is the RBar. The finished
                  swing is drawn back to its extreme (retroactive, flagged). Mirror for down swings.
   Ledger tag     ↑n  extent %  bars  avg effort  R(result vs last same-direction swing)  D/S(effort vs it)
-  Traffic light  per bar, with effort e, spread rs = TR/ATR[1], close position cp, direction by close vs C[1]:
-                 strong close = up & cp ≥ 0.67, or down & cp ≤ 0.33
-                 RED    stop    e ≥ 1.5 and (rs ≤ 0.9 or not a strong close)      effort without result
-                 GREEN  sync    e ≥ 1.1 and rs ≥ 1.1 and strong close             effort and result together
-                 ORANGE present e ≥ 1.1, neither red nor green                     effort with some result
-                 BLUE   ease    e ≤ 0.9 and rs ≥ 0.9 and strong close             less effort, more result
-  TL sequence    RED, then a GREEN within 10 bars, then a BLUE in the same direction within 10 bars of it
-                 (no opposite GREEN in between) = a swing is allowed to start (Roman's JCP / SQ drills).
+  Traffic light  (Roman, P-S5 JCP and P-S6 SQ) is read SWING by swing, from the ledger deltas against the
+                 previous swing in the same direction: dE = avg effort ratio, dR = |extent| ratio.
+                 RED    stop     dE ≥ 1.1 and dR ≤ 0.9   effort up, result down (stopping action)
+                 GREEN  sync     dE ≥ 1.1 and dR ≥ 1.1   effort and result expand together
+                 ease            dE ≤ 0.9 and dR ≥ 1.1   less effort, more result
+                    ORANGE present = an ease swing in the OLD direction after a RED (the next attempt still progresses)
+                    BLUE   ease    = any other ease swing (continuation with ease)
+  TL sequence    RED (direction d) → GREEN (−d) → BLUE (−d) within 6 swings = the reversal to −d is confirmed.
+                 ORANGE is optional. A GREEN back in direction d cancels. Red alone is never a reversal.
 """
 from __future__ import annotations
 
@@ -29,7 +30,8 @@ from . import core
 
 SBAR_K, COMBO_EACH, COMBO_SUM, TRAVEL_K = 1.25, 0.8, 1.25, 0.75
 TL_NONE, TL_RED, TL_ORANGE, TL_GREEN, TL_BLUE = 0, 1, 2, 3, 4
-SEQ_WINDOW = 10
+SEQ_SWINGS = 6
+E_UP, E_DN, R_UP, R_DN = 1.1, 0.9, 1.1, 0.9
 
 
 def ratio_band(x: float) -> str:
@@ -70,55 +72,6 @@ def sbars(o, h, l, c):
     return out
 
 
-def traffic_light(h, l, c, eff):
-    h, l, c, e = (np.asarray(x, float) for x in (h, l, c, eff))
-    tr = core.true_range(h, l, c)
-    atr = core.atr(h, l, c)
-    rs = tr / np.r_[np.nan, atr[:-1]]
-    cp = core.close_pos(h, l, c)
-    pc = np.r_[np.nan, c[:-1]]
-    tl = np.zeros(len(c), int)
-    tdir = np.zeros(len(c), int)
-    for i in range(len(c)):
-        if np.isnan(e[i]) or np.isnan(rs[i]) or np.isnan(pc[i]):
-            continue
-        d = 1 if c[i] > pc[i] else -1 if c[i] < pc[i] else 0
-        strong = (d == 1 and cp[i] >= 0.67) or (d == -1 and cp[i] <= 0.33)
-        tdir[i] = d
-        if e[i] >= 1.5 and (rs[i] <= 0.9 or not strong):
-            tl[i] = TL_RED
-        elif e[i] >= 1.1 and rs[i] >= 1.1 and strong:
-            tl[i] = TL_GREEN
-        elif e[i] >= 1.1:
-            tl[i] = TL_ORANGE
-        elif e[i] <= 0.9 and rs[i] >= 0.9 and strong:
-            tl[i] = TL_BLUE
-    return tl, tdir
-
-
-def tl_sequences(tl, tdir):
-    """+1 / −1 on the BLUE bar that completes RED → GREEN → BLUE in that direction."""
-    n = len(tl)
-    out = np.zeros(n, int)
-    red_i = -10**9
-    g_i, g_dir = -10**9, 0
-    for i in range(n):
-        if tl[i] == TL_RED:
-            red_i = i
-            g_i, g_dir = -10**9, 0
-        elif tl[i] == TL_GREEN and tdir[i] != 0:
-            if i - red_i <= SEQ_WINDOW and (g_dir == 0 or g_dir == tdir[i]):
-                if g_dir == 0:
-                    g_i = i
-                g_dir = tdir[i]
-            elif g_dir != 0 and tdir[i] != g_dir:      # opposite green breaks the sequence
-                g_i, g_dir, red_i = -10**9, 0, -10**9
-        elif tl[i] == TL_BLUE and g_dir != 0 and tdir[i] == g_dir and i - g_i <= SEQ_WINDOW:
-            out[i] = g_dir
-            red_i, g_i, g_dir = -10**9, -10**9, 0
-    return out
-
-
 @dataclass
 class Swing:
     n: int
@@ -134,6 +87,9 @@ class Swing:
     r_vs_prev: float = np.nan
     e_vs_prev: float = np.nan
 
+    tl: int = 0          # TL_NONE / RED / ORANGE / GREEN / BLUE (swing level)
+    seq: int = 0         # ±1 when this swing completes RED → GREEN → BLUE
+
     def tag(self) -> str:
         arrow = "↑" if self.direction == 1 else "↓"
         de = "D" if self.direction == 1 else "S"
@@ -146,6 +102,37 @@ class SwingResult:
     swings: list = field(default_factory=list)
     rbar: np.ndarray = None       # +1 RBar ending a down swing (bullish), −1 ending an up swing
     sbar: np.ndarray = None
+    tl: np.ndarray = None         # swing traffic light, written on the RBar that confirmed the swing
+    seq: np.ndarray = None        # ±1 on the RBar of the BLUE swing that completes a sequence
+
+
+def classify(sw: "Swing", st: dict) -> None:
+    """Swing traffic light and the RED → GREEN → BLUE sequence (state kept in `st`)."""
+    dE, dR = sw.e_vs_prev, sw.r_vs_prev
+    if st["stage"] and sw.n - st["k"] > SEQ_SWINGS:
+        st.update(dir=0, stage=0, k=-10**9)
+    if np.isnan(dE) or np.isnan(dR):
+        sw.tl = TL_NONE
+        return
+    if dE >= E_UP and dR <= R_DN:
+        sw.tl = TL_RED
+        st.update(dir=sw.direction, stage=1, k=sw.n)
+    elif dE >= E_UP and dR >= R_UP:
+        sw.tl = TL_GREEN
+        if st["stage"] >= 1 and sw.direction == -st["dir"]:
+            st.update(stage=2)
+        elif st["stage"] >= 1 and sw.direction == st["dir"]:
+            st.update(dir=0, stage=0, k=-10**9)          # sync back in the old direction cancels
+    elif dE <= E_DN and dR >= R_UP:
+        if st["stage"] == 1 and sw.direction == st["dir"]:
+            sw.tl = TL_ORANGE
+        else:
+            sw.tl = TL_BLUE
+            if st["stage"] == 2 and sw.direction == -st["dir"]:
+                sw.seq = sw.direction
+                st.update(dir=0, stage=0, k=-10**9)
+    else:
+        sw.tl = TL_NONE
 
 
 def ledger(o, h, l, c, eff) -> SwingResult:
@@ -158,7 +145,8 @@ def ledger(o, h, l, c, eff) -> SwingResult:
     trlo = np.where(np.isnan(pc), l, np.minimum(l, pc))
     trhi = np.where(np.isnan(pc), h, np.maximum(h, pc))
     rbar = np.zeros(n, int)
-    res = SwingResult(rbar=rbar, sbar=sb)
+    res = SwingResult(rbar=rbar, sbar=sb, tl=np.zeros(n, int), seq=np.zeros(n, int))
+    st = {"dir": 0, "stage": 0, "k": -10**9}      # sequence state: red direction, stage (1 red, 2 green), swing no.
     start = next((i for i in range(n) if not np.isnan(atr1[i])), None)
     if start is None or start + 1 >= n:
         return res
@@ -198,6 +186,8 @@ def ledger(o, h, l, c, eff) -> SwingResult:
                     sw.r_vs_prev = abs(sw.extent_pct) / abs(prev.extent_pct) if prev.extent_pct else np.nan
                     sw.e_vs_prev = sw.avg_effort / prev.avg_effort if prev.avg_effort else np.nan
                 last[d] = sw
+                classify(sw, st)
+                res.tl[i], res.seq[i] = sw.tl, sw.seq
                 res.swings.append(sw)
                 rbar[i] = -d
                 # new swing in the opposite direction starts at the old extreme
