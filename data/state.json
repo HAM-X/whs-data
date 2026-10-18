@@ -1,4 +1,12 @@
 {
- "problems": {},
+ "problems": {
+  "EURUSD:stale": "EURUSD: newest bar is 49h behind",
+  "GBPUSD:stale": "GBPUSD: newest bar is 48h behind",
+  "AUDUSD:stale": "AUDUSD: newest bar is 49h behind",
+  "NZDUSD:stale": "NZDUSD: newest bar is 49h behind",
+  "USDJPY:stale": "USDJPY: newest bar is 50h behind",
+  "USDCAD:stale": "USDCAD: newest bar is 49h behind",
+  "USDCHF:stale": "USDCHF: newest bar is 50h behind"
+ },
  "last_ok_day": null
 }
