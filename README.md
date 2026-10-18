@@ -17,4 +17,6 @@ Planned layout:
 Secrets used (set in Settings → Secrets and variables → Actions, never in code):
 `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`.
 
+Alerts are delivered by the Telegram bot **Pipdon BOT**.
+
 Status: Stage 0 setup. First job: `telegram-test` (run it from the Actions tab).

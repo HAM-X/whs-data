@@ -24,7 +24,7 @@ jobs:
           NOW_UTC3=$(TZ='Africa/Nairobi' date '+%a %d %b %Y %H:%M')
           RESP=$(curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
-            --data-urlencode "text=WHS Robot online ✅ ${NOW_UTC3} (UTC+3) · whs-data")
+            --data-urlencode "text=Pipdon BOT online ✅ ${NOW_UTC3} (UTC+3) · whs-data")
           if echo "$RESP" | grep -q '"ok":true'; then
             echo "Message delivered."
           else
