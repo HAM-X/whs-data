@@ -9,7 +9,9 @@ contract volume, which only TradingView can see) are compared too.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -36,7 +38,7 @@ def compare(a, b, name):
                 na_disagree=only)
 
 
-def main(path: str, tf: int) -> int:
+def main(path: str, tf: int, root: str | None = None) -> int:
     d = pd.read_csv(path)
     t = pd.to_datetime(d["time"], utc=True)
     h, l, c = col(d, "high"), col(d, "low"), col(d, "close")
@@ -48,12 +50,25 @@ def main(path: str, tf: int) -> int:
         "Core close pos": core.close_pos(h, l, c),
         "Effort": core.effort(veff, t, tf),
     }
-    rows = [compare(col(d, k), v, k) for k, v in py.items()]
+    # TradingView runs the script on history older than the export, so ATR (Wilder memory) and the
+    # same-slot buffers start from state the file doesn't contain. Skip a warm-up long enough for both
+    # to be fully determined by exported bars: (13/14)^500 < 1e-16, and every slot refilled 20+ times.
+    warm = max(500, 30 * int(round(1440 / tf)))
+    rows = [compare(col(d, k).iloc[warm:], v[warm:], k) for k, v in py.items()]
     roll_bars = int(col(d, "Core in roll").sum())
+    root = root or (re.search(r"(6[EBANJCS]|GC)\d?!?|_(6[EBANJCS]|GC)1_", Path(path).name) or [None, None])[0]
+    if root:
+        root = re.sub(r"[^A-Z0-9]", "", root)[:2]
+        ct = t.dt.tz_convert(core.CT)
+        sess = (ct + pd.Timedelta(hours=7)).dt.date
+        exp = sess.map(lambda x: core.in_roll_window(root, x)).astype(float).to_numpy()
+        got = col(d, "Core in roll").to_numpy()
+        rows.append(dict(value=f"Roll window ({root})", compared=len(d), mismatches=int((exp != got).sum()),
+                         worst=float(np.abs(exp - got).max()), na_disagree=0))
     rep = pd.DataFrame(rows)
     print(rep.to_string(index=False))
-    print(f"\nbars {len(d)} · roll-window bars {roll_bars} · first {t.iloc[0]} · last {t.iloc[-1]}")
-    ok = (rep["mismatches"] == 0).all() and (rep["na_disagree"] <= 25).all()
+    print(f"\nbars {len(d)} (first {warm} = warm-up, not compared) · roll-window bars {roll_bars} · first {t.iloc[0]} · last {t.iloc[-1]}")
+    ok = (rep["mismatches"] == 0).all() and (rep["na_disagree"] == 0).all()
     print("R0 PARITY:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -62,5 +77,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("export")
     ap.add_argument("--tf", type=int, default=60, help="timeframe in minutes (60 for 1h, 240 for 4h)")
+    ap.add_argument("--root", help="contract root, e.g. 6E (default: read from the file name)")
     a = ap.parse_args()
-    sys.exit(main(a.export, a.tf))
+    sys.exit(main(a.export, a.tf, a.root))
