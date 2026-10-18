@@ -1,0 +1,34 @@
+name: telegram-test
+
+# Step 0.3 check: sends one message to your phone. Run it from Actions → telegram-test → Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send test message
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "::error::TELEGRAM_TOKEN or TELEGRAM_CHAT_ID secret is missing in this repository."
+            exit 1
+          fi
+          NOW_UTC3=$(TZ='Africa/Nairobi' date '+%a %d %b %Y %H:%M')
+          RESP=$(curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=WHS Robot online ✅ ${NOW_UTC3} (UTC+3) · whs-data")
+          if echo "$RESP" | grep -q '"ok":true'; then
+            echo "Message delivered."
+          else
+            DESC=$(echo "$RESP" | sed -n 's/.*"description":"\([^"]*\)".*/\1/p')
+            echo "::error::Telegram refused the message: ${DESC:-unknown error}"
+            exit 1
+          fi
