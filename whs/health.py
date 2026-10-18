@@ -42,7 +42,7 @@ def check_symbol(key: str, df: pd.DataFrame, now, fetch_error: str | None, kind:
         if key in VOLUME_CHECKED:
             t = df.tail(ZERO_VOL_BARS)
             active = t["time"].dt.tz_convert(EXCHANGE_TZ).dt.hour.between(2, 15).all()
-            if len(t) == ZERO_VOL_BARS and active and (t["volume"] == 0).all():
+            if len(t) == ZERO_VOL_BARS and active and (t["volume"].fillna(0) == 0).all():
                 probs.append(dict(key=f"{key}:novol", sym=key, text=f"{key}: zero volume for {ZERO_VOL_BARS} active bars"))
     return probs
 

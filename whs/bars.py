@@ -33,6 +33,20 @@ def normalise(df: pd.DataFrame, now=None, step=pd.Timedelta(hours=1)) -> pd.Data
     return out[COLUMNS].sort_values("time").reset_index(drop=True)
 
 
+def clean_future(df: pd.DataFrame) -> pd.DataFrame:
+    """Yahoo quirks on CME futures, found in the step 1.5 cross-check against TradingView:
+    - stray bars stamped inside the 16:00-17:00 CT halt (CME is closed) -> dropped
+    - the 17:00 CT session-open bar arrives with volume 0 although it traded -> volume marked missing (NaN)
+    """
+    from .market import is_open
+    if df.empty:
+        return df
+    d = df[df["time"].map(is_open)].copy()
+    ct_hour = d["time"].dt.tz_convert(EXCHANGE_TZ).dt.hour
+    d.loc[(ct_hour == SESSION_OPEN_HOUR_CT) & (d["volume"] == 0), "volume"] = float("nan")
+    return d.reset_index(drop=True)
+
+
 def read(path: Path) -> pd.DataFrame:
     if not Path(path).exists():
         return pd.DataFrame(columns=COLUMNS)
@@ -63,7 +77,8 @@ def merge(old: pd.DataFrame, new: pd.DataFrame) -> tuple[pd.DataFrame, int, int]
     n = new.set_index("time")
     common = o.index.intersection(n.index)
     cols = ["open", "high", "low", "close", "volume"]
-    revised = int((o.loc[common, cols].round(10) != n.loc[common, cols].round(10)).any(axis=1).sum())
+    a, b = o.loc[common, cols].round(10).fillna(-1), n.loc[common, cols].round(10).fillna(-1)
+    revised = int((a != b).any(axis=1).sum())
     added = len(n.index.difference(o.index))
     m = pd.concat([o[~o.index.isin(n.index)], n]).sort_index().reset_index()
     return m[COLUMNS], added, revised

@@ -11,7 +11,8 @@ FUTURES = {
     "6C": {"yahoo": "6C=F", "tick": 0.00005, "name": "Canadian Dollar"},
     "6S": {"yahoo": "6S=F", "tick": 0.00005, "name": "Swiss Franc"},
     "GC": {"yahoo": "GC=F", "tick": 0.10, "name": "Gold"},
-    "DX": {"yahoo": "DX=F", "tick": 0.005, "name": "US Dollar Index (ICE)"},
+    "DX": {"yahoo": "DX-Y.NYB", "tick": 0.005, "name": "US Dollar Index (ICE index; DX=F has no hourly data on Yahoo)",
+           "context": True},
 }
 
 SPOT = {
@@ -25,7 +26,7 @@ SPOT = {
     "XAUUSD": {"yahoo": "XAUUSD=X", "optional": True},  # Yahoo coverage of spot gold is patchy
 }
 
-# Futures checked for effort-related health (volume). DX is context only.
+# Futures checked for effort-related health (volume). DX is context only (price, no real volume).
 VOLUME_CHECKED = [k for k in FUTURES if k != "DX"]
 
 EXCHANGE_TZ = "America/Chicago"   # all sessions are keyed to CME time

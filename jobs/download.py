@@ -38,13 +38,18 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
         period = "2y" if (backfill or old.empty) else "5d"
         raw, err = fetch(meta["yahoo"], period=period)
         new = bars.normalise(raw, now=now)
+        if kind == "future" and not meta.get("context"):
+            new = bars.clean_future(new)
         merged, added, revised = bars.merge(old, new)
+        if kind == "future" and not meta.get("context"):
+            merged = bars.clean_future(merged)      # also cleans bars stored before this rule existed
         if not merged.empty:
             bars.write(merged, path)
             if kind == "future":
                 bars.write(bars.build_4h(merged, now=now), DATA / "bars" / "4h" / f"{key}.csv")
         optional_missing = meta.get("optional") and merged.empty
-        probs = [] if optional_missing else health.check_symbol(key, merged, now, err, kind)
+        health_kind = "spot" if meta.get("context") else kind   # context series: freshness checks only
+        probs = [] if optional_missing else health.check_symbol(key, merged, now, err, health_kind)
         problems += probs
         report[key] = dict(
             kind=kind, yahoo=meta["yahoo"], bars=len(merged), added=added, revised=revised,

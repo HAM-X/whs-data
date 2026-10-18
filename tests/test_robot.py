@@ -141,3 +141,15 @@ def test_run_end_to_end(tmp_path, monkeypatch):
     assert sent == []                                              # no repeat for a known problem
     state = json.loads((tmp_path / "data" / "state.json").read_text())
     assert "6J:stale" in state["problems"]
+
+
+def test_clean_future_drops_halt_bars_and_marks_open_volume():
+    times = session_hours("2026-10-19 13:00", 6)              # 13,14,15 CT then 17,18,19 CT
+    raw = frame(times)
+    stray = ct("2026-10-19 16:00")                             # a bar inside the halt
+    raw.loc[stray.tz_convert("America/New_York")] = raw.iloc[0]
+    raw.loc[ct("2026-10-19 17:00").tz_convert("America/New_York"), "Volume"] = 0
+    d = bars.clean_future(bars.normalise(raw.sort_index()))
+    hours = list(d["time"].dt.tz_convert(CT).dt.hour)
+    assert 16 not in hours and len(d) == 6
+    assert np.isnan(d.loc[d["time"] == ct("2026-10-19 17:00"), "volume"]).all()
