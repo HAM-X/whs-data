@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, health, snapshot, telegram
+from whs import bars, health, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -88,6 +88,7 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
                    problems=problems, symbols=report)
     (DATA / "health.json").write_text(json.dumps(summary, indent=1, default=str))
     write_snapshot(summary, now)
+    write_scan(send)
     return summary
 
 
@@ -102,6 +103,23 @@ def write_snapshot(summary: dict, now) -> None:
         (DATA / "snapshot.json").write_text(json.dumps(snap, separators=(",", ":"), default=str))
     except Exception as e:   # the snapshot must never break data collection
         print(f"[snapshot error] {type(e).__name__}: {e}")
+
+
+def write_scan(send=telegram.send) -> None:
+    """Stage 3: read every chart (major swings + automatic ranges + Story) → data/scan.json, and alert what changed."""
+    try:
+        h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
+        h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
+        res = scan.scan({k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)})
+        (DATA / "scan.json").write_text(json.dumps(res, separators=(",", ":"), default=str))
+        sp = DATA / "scan_state.json"
+        seen = json.loads(sp.read_text()) if sp.exists() else {}
+        lines, marks = scan.news(res, seen)
+        sp.write_text(json.dumps(marks, indent=1))
+        if lines:
+            send("🔎 Wyckoff scan\n" + "\n".join(lines[:25]) + ("\n…" if len(lines) > 25 else ""))
+    except Exception as e:   # the scan must never break data collection
+        print(f"[scan error] {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
