@@ -61,3 +61,18 @@ test("TradingView alerts become Telegram messages with a flag", () => {
   assert.match(tvMessage('{"text":"6B1! 60 · Spring #3"}'), /Spring #3/);
   assert.ok(!tvMessage("<script>").includes("<script>"));
 });
+
+// Stage 3 scan commands
+{
+  const { route, scanReport, storyReport } = await import("./worker.js");
+  const sc = { "6E 4h": { major: { state: 0, box: [1.1142, 1.1309], protected: null },
+    ranges: [{ id: "2026-10-05T02:00:00+00:00", kind: "SC", phase: "B", name: "Accumulation / Distribution", support: 1.1142, resistance: 1.1309,
+      story: ["#1 A: SC on 6.1×"], bias: "OPEN · Accumulation 1 vs Distribution 0" }] } };
+  const a = scanReport(sc);
+  if (!a.includes("sideways") || !a.includes("phase B")) throw new Error("scan report");
+  const b = storyReport(sc, "6E", "4h");
+  if (!b.includes("#1 A") || !b.includes("BIAS")) throw new Error("story report");
+  if (!route("/story euro", {}, {}, sc).includes("SC on 6.1")) throw new Error("story route");
+  if (!route("show me the wyckoff story for euro", {}, {}, sc).includes("BIAS")) throw new Error("story words");
+  console.log("ok scan commands");
+}

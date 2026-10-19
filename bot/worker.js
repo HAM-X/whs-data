@@ -50,6 +50,8 @@ export function help() {
     "/strength — currency strength ranking (add 1h, 1d or 1w)",
     "/convert 6J 0.0067100 — futures level → MT5 price",
     "/size 6E 1.0909 1.0889 B 100000 — lots for a trade (risk as A/B/C or %, then balance)",
+    "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
+    "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
     "/health — is the robot's data fresh?",
     "",
     "Symbols: 6E 6B 6A 6N 6J 6C 6S GC DX (or euro, pound, aussie, kiwi, yen, cad, franc, gold, dollar).",
@@ -187,8 +189,36 @@ export function health(snap) {
     `<pre>${esc(syms.join("\n"))}</pre>` + ageWarning(snap) + footer(snap);
 }
 
+// ---------- Stage 3: the robot's own Wyckoff read (data/scan.json) ----------
+const MAJ = { 1: "↑ major up", "-1": "↓ major down", 0: "↔ sideways" };
+const p5 = (v) => (v == null ? "—" : Number(v).toPrecision(5));
+export function scanReport(sc) {
+  if (!sc) return "No scan yet — the robot writes it every hour.";
+  const rows = [];
+  for (const [key, r] of Object.entries(sc)) {
+    const m = r.major || {};
+    let line = `${key.padEnd(6)} ${MAJ[m.state] || "—"}`;
+    if (m.state === 0 && m.box) line += ` ${p5(m.box[0])}–${p5(m.box[1])}`;
+    else if (m.protected != null) line += ` holds ${m.state === 1 ? ">" : "<"} ${p5(m.protected)}`;
+    const g = (r.ranges || []).slice(-1)[0];
+    if (g) line += `\n       range ${g.id.slice(5, 10)}: phase ${g.phase} · ${g.name}`;
+    rows.push(line);
+  }
+  return "<b>Wyckoff scan</b> (robot, Yahoo data)\n<pre>" + esc(rows.join("\n")) + "</pre>\n<i>/story 6E 4h for the full read.</i>";
+}
+export function storyReport(sc, key, tf) {
+  const r = sc && sc[`${key} ${tf}`];
+  if (!r) return `No scan for ${key} ${tf}.`;
+  const g = (r.ranges || []).slice(-1)[0];
+  if (!g) return `${key} ${tf}: no live range right now (${MAJ[(r.major || {}).state] || "—"}).`;
+  return `<b>${key} ${tf} · range from ${esc(g.id.slice(0, 16).replace("T", " "))} UTC (${g.kind})</b>\n` +
+    `${p5(g.support)} – ${p5(g.resistance)} · phase ${g.phase}\n\n` +
+    g.story.map((x) => esc(x)).join("\n") + `\n\n<b>BIAS</b> ${esc(g.bias)}`;
+}
+export const wantsScan = (text) => /^\/(scan|story)\b|\b(scan|story|wyckoff|range|ranges)\b/i.test(text || "");
+
 // ---------- routing ----------
-export function route(text, snap, env = {}) {
+export function route(text, snap, env = {}, sc = null) {
   const raw = (text || "").trim();
   const [cmd0, ...args] = raw.split(/\s+/);
   const cmd = cmd0.toLowerCase().replace(/@.*$/, "");
@@ -202,6 +232,8 @@ export function route(text, snap, env = {}) {
     case "/effort": return need(sym(args[0]), (k) => effortReport(snap, k));
     case "/strength": return strengthReport(snap, ["1h", "1d", "1w"].includes(args[0]) ? args[0] : "1d");
     case "/health": return health(snap);
+    case "/scan": return scanReport(sc);
+    case "/story": return need(sym(args[0]), (k) => storyReport(sc, k, args[1] === "1h" ? "1h" : "4h"));
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
     case "/size": return need(sym(args[0]), (k) => size(snap, k, parseFloat(args[1]), parseFloat(args[2]), args[3], parseFloat(args[4]), env));
   }
@@ -212,6 +244,8 @@ export function route(text, snap, env = {}) {
     const win = /\bweek|weekly|1w\b/.test(t) ? "1w" : /\bhour|1h\b/.test(t) ? "1h" : "1d";
     return strengthReport(snap, win);
   }
+  if (/\b(story|wyckoff)\b/.test(t) && k) return storyReport(sc, k, /\b1h\b/.test(t) ? "1h" : "4h");
+  if (/\b(scan|ranges)\b/.test(t) && !k) return scanReport(sc);
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (/\b(all|overview|market|everything|dashboard|summary)\b/.test(t) && !k) return all(snap);
   if (k && /\b(effort|volume|vol|supply|demand)\b/.test(t)) return effortReport(snap, k);
@@ -226,6 +260,12 @@ async function loadSnapshot(env) {
   const r = await fetch(url, { cf: { cacheTtl: 60 } });
   if (!r.ok) throw new Error(`snapshot HTTP ${r.status}`);
   return r.json();
+}
+
+async function loadScan(env) {
+  const url = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/scan.json?t=" + Math.floor(Date.now() / 120000);
+  const r = await fetch(url, { cf: { cacheTtl: 60 } });
+  return r.ok ? r.json() : null;
 }
 
 async function reply(env, chatId, text) {
@@ -263,7 +303,8 @@ export default {
     if (String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return new Response("ok");   // only Hamza
     let text;
     try {
-      text = route(msg.text, await loadSnapshot(env), env);
+      const sc = wantsScan(msg.text) ? await loadScan(env).catch(() => null) : null;
+      text = route(msg.text, await loadSnapshot(env), env, sc);
     } catch (e) {
       text = `⚠️ Could not read the robot's snapshot (${esc(e.message)}). Try again in a minute.`;
     }
