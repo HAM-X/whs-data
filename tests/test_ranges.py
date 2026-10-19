@@ -131,3 +131,17 @@ def test_a_range_is_alive_until_price_has_stayed_out():
     a1, a2 = lab.index("2025-01-13 10:00"), lab.index("2025-01-27 14:00")
     r = _read(d, eff, a1, a2)
     assert r.outcome == 1 and not r.left and r.box_end == r.end == len(d) - 1
+
+
+def test_the_story_tells_the_range_in_four_steps():
+    from whs import story, swings
+    d, lab, eff = _load()
+    o, h, l, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+    r = ranges.read(o, h, l, c, eff, d.volume.to_numpy(float), lab.index("2024-11-14 14:00"),
+                    lab.index("2024-11-18 22:00"), htf=-1)
+    s = story.build(o, h, l, c, eff, r, swings.ledger(o, h, l, c, eff))
+    assert [n for n, _, _ in s.steps] == [1, 2, 3, 4]
+    assert s.steps[0][2].startswith("SC on") and "AR" in s.steps[0][2]
+    assert "UTAD" in s.steps[2][2] and s.steps[3][2].startswith("SOW on")
+    assert s.bias.startswith("REDISTRIBUTION") and "fails above" in s.bias and s.bias_dir == -1
+    assert s.fails > r.support
