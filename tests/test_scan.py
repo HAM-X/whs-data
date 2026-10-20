@@ -32,3 +32,13 @@ def test_news_is_quiet_first_then_only_new():
     later, marks2 = scan.news(b, marks)
     assert all(l.split(" · ")[0].endswith("6E 4h") for l in later)
     assert scan.news(b, marks2)[0] == []
+
+
+def test_morning_brief_ranks_charts_and_lists_events():
+    from whs import brief
+    d = _bars()
+    sc = {"6E 4h": scan.read_one(d, "4h", scan.daily(d))}
+    snap = {"generated_local": "Tue 08:12", "health": {}, "instruments": {"DX": {"day": {"change_pct": 0.1}}},
+            "strength": {"1d": [{"ccy": "EUR"}, {"ccy": "USD"}]}}
+    txt = brief.build(snap, sc, now=d["time"].iloc[-1] + pd.Timedelta(hours=1))
+    assert txt.startswith("☀️ Morning brief") and "EUR > USD" in txt and ("Top 3" in txt)

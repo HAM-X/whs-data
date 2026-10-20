@@ -9,13 +9,16 @@ import urllib.request
 from .config import BOT_NAME
 
 
-def send(text: str) -> bool:
+def send(text: str, html: bool = False) -> bool:
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     msg = f"{BOT_NAME} · {text}"
     if not token or not chat:
         print("[telegram skipped: no secrets]\n" + msg)
         return False
-    data = urllib.parse.urlencode({"chat_id": chat, "text": msg, "disable_web_page_preview": "true"}).encode()
+    fields = {"chat_id": chat, "text": msg[:4000], "disable_web_page_preview": "true"}
+    if html:
+        fields["parse_mode"] = "HTML"
+    data = urllib.parse.urlencode(fields).encode()
     try:
         with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=20) as r:
             ok = json.load(r).get("ok", False)

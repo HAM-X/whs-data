@@ -50,6 +50,7 @@ export function help() {
     "/strength — currency strength ranking (add 1h, 1d or 1w)",
     "/convert 6J 0.0067100 — futures level → MT5 price",
     "/size 6E 1.0909 1.0889 B 100000 — lots for a trade (risk as A/B/C or %, then balance)",
+    "/brief — this morning's brief (rebuilt every hour)",
     "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
     "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
     "/health — is the robot's data fresh?",
@@ -196,6 +197,7 @@ export function scanReport(sc) {
   if (!sc) return "No scan yet — the robot writes it every hour.";
   const rows = [];
   for (const [key, r] of Object.entries(sc)) {
+    if (key.startsWith("__")) continue;
     const m = r.major || {};
     let line = `${key.padEnd(6)} ${MAJ[m.state] || "—"}`;
     if (m.state === 0 && m.box) line += ` ${p5(m.box[0])}–${p5(m.box[1])}`;
@@ -215,7 +217,7 @@ export function storyReport(sc, key, tf) {
     `${p5(g.support)} – ${p5(g.resistance)} · phase ${g.phase}\n\n` +
     g.story.map((x) => esc(x)).join("\n") + `\n\n<b>BIAS</b> ${esc(g.bias)}`;
 }
-export const wantsScan = (text) => /^\/(scan|story)\b|\b(scan|story|wyckoff|range|ranges)\b/i.test(text || "");
+export const wantsScan = (text) => /^\/(scan|story|brief)\b|\b(scan|story|wyckoff|range|ranges|brief|morning)\b/i.test(text || "");
 
 // ---------- routing ----------
 export function route(text, snap, env = {}, sc = null) {
@@ -233,6 +235,7 @@ export function route(text, snap, env = {}, sc = null) {
     case "/strength": return strengthReport(snap, ["1h", "1d", "1w"].includes(args[0]) ? args[0] : "1d");
     case "/health": return health(snap);
     case "/scan": return scanReport(sc);
+    case "/brief": return sc && sc.__brief ? sc.__brief : "No brief yet — the robot writes it every hour.";
     case "/story": return need(sym(args[0]), (k) => storyReport(sc, k, args[1] === "1h" ? "1h" : "4h"));
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
     case "/size": return need(sym(args[0]), (k) => size(snap, k, parseFloat(args[1]), parseFloat(args[2]), args[3], parseFloat(args[4]), env));
@@ -246,6 +249,7 @@ export function route(text, snap, env = {}, sc = null) {
   }
   if (/\b(story|wyckoff)\b/.test(t) && k) return storyReport(sc, k, /\b1h\b/.test(t) ? "1h" : "4h");
   if (/\b(scan|ranges)\b/.test(t) && !k) return scanReport(sc);
+  if (/\b(brief|morning)\b/.test(t)) return sc && sc.__brief ? sc.__brief : "No brief yet.";
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (/\b(all|overview|market|everything|dashboard|summary)\b/.test(t) && !k) return all(snap);
   if (k && /\b(effort|volume|vol|supply|demand)\b/.test(t)) return effortReport(snap, k);
@@ -263,9 +267,13 @@ async function loadSnapshot(env) {
 }
 
 async function loadScan(env) {
-  const url = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/scan.json?t=" + Math.floor(Date.now() / 120000);
-  const r = await fetch(url, { cf: { cacheTtl: 60 } });
-  return r.ok ? r.json() : null;
+  const base = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/";
+  const q = "?t=" + Math.floor(Date.now() / 120000);
+  const [a, b] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
+                                    fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } })]);
+  const sc = a.ok ? await a.json() : {};
+  if (b.ok) sc.__brief = (await b.json()).text;
+  return sc;
 }
 
 async function reply(env, chatId, text) {

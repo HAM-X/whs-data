@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, health, scan, snapshot, telegram
+from whs import bars, brief, health, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -89,6 +89,7 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
     (DATA / "health.json").write_text(json.dumps(summary, indent=1, default=str))
     write_snapshot(summary, now)
     write_scan(send)
+    write_brief(now, send)
     return summary
 
 
@@ -120,6 +121,28 @@ def write_scan(send=telegram.send) -> None:
             send("🔎 Wyckoff scan\n" + "\n".join(lines[:25]) + ("\n…" if len(lines) > 25 else ""))
     except Exception as e:   # the scan must never break data collection
         print(f"[scan error] {type(e).__name__}: {e}")
+
+
+def write_brief(now, send=telegram.send) -> None:
+    """Morning brief: rebuilt every run into data/brief.json (the bot's /brief); sent once a day from 08:00 UTC+3."""
+    try:
+        snap = json.loads((DATA / "snapshot.json").read_text())
+        sc = json.loads((DATA / "scan.json").read_text())
+        text = brief.build(snap, sc, now)
+        (DATA / "brief.json").write_text(json.dumps({"at": str(now), "text": text}))
+        state = load_state()
+        local = pd.Timestamp(now).tz_convert(LOCAL_TZ)
+        today = local.strftime("%Y-%m-%d")
+        if local.hour >= 8 and state.get("last_brief_day") != today and is_open(now):
+            try:
+                ok = send(text, html=True)
+            except TypeError:            # simple senders (tests) take the text only
+                ok = send(text)
+            if ok is not False:
+                state["last_brief_day"] = today
+                STATE.write_text(json.dumps(state, indent=1))
+    except Exception as e:   # the brief must never break data collection
+        print(f"[brief error] {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
