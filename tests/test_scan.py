@@ -42,3 +42,15 @@ def test_morning_brief_ranks_charts_and_lists_events():
             "strength": {"1d": [{"ccy": "EUR"}, {"ccy": "USD"}]}}
     txt = brief.build(snap, sc, now=d["time"].iloc[-1] + pd.Timedelta(hours=1))
     assert txt.startswith("☀️ Morning brief") and "EUR > USD" in txt and ("Top 3" in txt)
+
+
+def test_trade_desk_stop_translate_and_grade():
+    from whs import desk
+    # stop: structure − 0.5 ATR(1h) − 1 tick, rounded down (Roman ex. 1: BU low 1.0896 → 1.0889 with ATR1h 0.0013)
+    assert abs(desk._round_away(1.0896 - (0.5 * 0.0013 + 0.00005), 0.00005, 1) - 1.0889) < 1e-9
+    # translate: 6E same direction, 6J inverted (Roman ex. A / B)
+    assert abs(desk.to_mt5("6E", 1.0889, 1.0909, 1.0874) - 1.08541) < 1e-4
+    assert abs(desk.to_mt5("6J", 0.00669, 0.00671, 149.60) - 150.047) < 0.01
+    assert desk.lots("6E", 1.0909, 1.0889, 1.0909, 1.0874, 500) == 2.5
+    assert desk.grade_of(9, "BU") == "B"          # A stays capped at B until Edge Lab proves the setup
+    assert desk.grade_of(5, "BU") == "C" and desk.grade_of(3, "BU") == "F"

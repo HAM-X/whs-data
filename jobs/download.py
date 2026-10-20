@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, brief, health, scan, snapshot, telegram
+from whs import bars, brief, desk, health, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -111,14 +111,27 @@ def write_scan(send=telegram.send) -> None:
     try:
         h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
         h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
-        res = scan.scan({k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)})
+        snap = json.loads((DATA / "snapshot.json").read_text()) if (DATA / "snapshot.json").exists() else {}
+        res = scan.scan({k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)},
+                        (snap.get("strength") or {}).get("1d"))
         (DATA / "scan.json").write_text(json.dumps(res, separators=(",", ":"), default=str))
         sp = DATA / "scan_state.json"
         seen = json.loads(sp.read_text()) if sp.exists() else {}
+        plans = scan.fresh_plans(res, seen)
         lines, marks = scan.news(res, seen)
+        lines += [scan.plan_line(p) for p in plans if p["refused"] or p["rr_low"]]
+        plans = [p for p in plans if not (p["refused"] or p["rr_low"])]
         sp.write_text(json.dumps(marks, indent=1))
         if lines:
             send("🔎 Wyckoff scan\n" + "\n".join(lines[:25]) + ("\n…" if len(lines) > 25 else ""))
+        for p in plans[:6]:
+            inst = (snap.get("instruments") or {}).get(p["key"]) or {}
+            m5 = inst.get("mt5") or {}
+            txt = desk.card(p, inst.get("price"), m5.get("spot"))
+            try:
+                send(txt, html=True)
+            except TypeError:
+                send(txt)
     except Exception as e:   # the scan must never break data collection
         print(f"[scan error] {type(e).__name__}: {e}")
 

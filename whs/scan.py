@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from . import core, degrees, ranges, story, swings
+from . import core, degrees, desk, ranges, story, swings
 from .config import EXCHANGE_TZ, FUTURES
 
 TF_MIN = {"1h": 60, "4h": 240}
@@ -56,7 +56,7 @@ def auto_anchors(h, l, mr: degrees.MajorResult, n: int, recent: int) -> list[tup
     return out
 
 
-def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None) -> dict:
+def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None, ctx: dict | None = None) -> dict:
     o, h, l, c, v = (d[k].to_numpy(float) for k in ("open", "high", "low", "close", "volume"))
     t = d["time"]
     eff = core.effort(v, t, TF_MIN[tf])
@@ -65,7 +65,7 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None) -> dict:
     mr = degrees.majors(o, h, l, c, eff, led)
     live = mr.majors[-1] if mr.majors else None
     out = {"bars": n, "last": t.iloc[-1].isoformat(), "close": float(c[-1]),
-           "major": None, "major_events": [], "ranges": []}
+           "major": None, "major_events": [], "ranges": [], "plans": []}
     if live is not None:
         out["major"] = {"state": int(live.direction), "since": t.iloc[live.start_i].isoformat(),
                         "protected": None if np.isnan(mr.protected[-1]) else float(mr.protected[-1]),
@@ -81,6 +81,12 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None) -> dict:
         if not rr.events or rr.left or (not box_live and ph == "A"):
             continue                 # no range · already over · a box price left before it built any cause
         st = story.build(o, h, l, c, eff, rr, led)
+        if ctx:
+            try:
+                out["plans"] += desk.plans(ctx["key"], tf, h, l, c, rr, st, ctx["atr1h"], ctx["atr4h"], ctx["tick"],
+                                           htf_at(htf_bars, t.iloc[-1]), ctx.get("strength"))
+            except Exception as e:
+                print(f"[desk error] {ctx['key']} {tf}: {type(e).__name__}: {e}")
         out["ranges"].append({
             "id": t.iloc[a1].isoformat(), "kind": rr.kind, "a2": t.iloc[a2].isoformat(),
             "phase": ph, "outcome": rr.outcome, "left": bool(rr.left),
@@ -93,8 +99,16 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None) -> dict:
     return out
 
 
-def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame]) -> dict:
+def _atr_now(d):
+    if d is None or len(d) < 20:
+        return None
+    return float(core.atr(d["high"].to_numpy(float), d["low"].to_numpy(float), d["close"].to_numpy(float))[-1])
+
+
+def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame], strength: list | None = None) -> dict:
+    """strength: snapshot['strength']['1d'] rows (ccy, vs_usd_pct) — for the Trade Desk grade."""
     res = {}
+    vs = {x["ccy"]: x.get("vs_usd_pct") for x in (strength or [])}
     for key in FUTURES:
         if FUTURES[key].get("context"):
             continue
@@ -104,8 +118,12 @@ def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame]) -> dict:
                 continue
             d = d.reset_index(drop=True)
             htf_bars = h4.get(key) if tf == "1h" else daily(d)
+            a1, a4 = _atr_now(h1.get(key)), _atr_now(h4.get(key))
+            ccy = desk.CCY.get(key)
+            srank = vs.get(ccy) if ccy else (-vs["USD"] if key == "GC" and vs.get("USD") is not None else None)
+            ctx = dict(key=key, atr1h=a1, atr4h=a4, tick=FUTURES[key]["tick"], strength=srank) if a1 and a4 else None
             try:
-                res[f"{key} {tf}"] = read_one(d, tf, htf_bars)
+                res[f"{key} {tf}"] = read_one(d, tf, htf_bars, ctx)
             except Exception as e:
                 print(f"[scan error] {key} {tf}: {type(e).__name__}: {e}")
     return res
@@ -124,7 +142,8 @@ def news(scan_now: dict, last_seen: dict) -> tuple[list[str], dict]:
     lines, marks = [], {}
     for key, r in scan_now.items():
         seen = last_seen.get(key)
-        marks[key] = {"last": r["last"], "ranges": [g["id"] for g in r["ranges"]]}
+        marks[key] = {"last": r["last"], "ranges": [g["id"] for g in r["ranges"]],
+                      "plans": sorted(set(seen.get("plans", []) if seen else []) | {p["id"] for p in r.get("plans", [])})[-50:]}
         if not seen:                # first scan of this chart: remember, do not flood
             continue
         t0, known = seen["last"], set(seen.get("ranges", []))
@@ -140,3 +159,23 @@ def news(scan_now: dict, last_seen: dict) -> tuple[list[str], dict]:
                     icon = next((v for k, v in ICON.items() if k in txt), "📐")
                     lines.append(f"{icon} {key} · range from {rid} · {txt}")
     return lines, marks
+
+
+def fresh_plans(scan_now: dict, last_seen: dict) -> list[dict]:
+    """Trade plans not announced before (grade F is never sent). Silent on a chart's first scan."""
+    out = []
+    for key, r in scan_now.items():
+        seen = last_seen.get(key)
+        if not seen:
+            continue
+        done = set(seen.get("plans", []))
+        out += [p for p in r.get("plans", []) if p["id"] not in done and p["grade"] != "F"]
+    return out
+
+
+def plan_line(p: dict) -> str:
+    """One line for a plan that is not a trade (stop too wide or R/R too low)."""
+    why = (f"stop too wide ({abs(p['entry'] - p['stop']):.5g} > 1.5 × ATR 4h) — wait for an {'LPS' if p['side'] == 1 else 'LPSY'}"
+           if p["refused"] else f"R/R {p['rr']} below {p['min_rr']} — no trade")
+    return f"⛔ {p['key']} {p['tf']} · {p['setup']} · {why}"
+
