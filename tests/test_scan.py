@@ -65,3 +65,9 @@ def test_panel_heat_and_persistence():
            ("1w", "CHF JPY EUR USD GBP AUD NZD CAD".split()))}
     p = panel.persistence(st)
     assert p["JPY"].startswith("strong") and p["CAD"].startswith("weak")
+
+
+def test_edge_lab_proven_setups_may_grade_a():
+    from whs import desk
+    assert desk.grade_of(9, "Spring") == "A" and desk.grade_of(9, "UTAD") == "A" and desk.grade_of(9, "Shakeout") == "A"
+    assert desk.grade_of(9, "SOS bar") == "B" and desk.grade_of(9, "Test of the spring") == "B"

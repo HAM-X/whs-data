@@ -16,7 +16,7 @@ The robot turns a fresh, confirmed Wyckoff entry event of a live range into a co
   GRADE    10 points (Roman's proforma): higher timeframe not against (2) · currency strength agrees (2) ·
            structure: confirmed entry event (3) · story evidence for the side ≥ 75 % (2, ≥ 50 % 1) ·
            R/R ≥ the trigger's minimum (1). 8–10 A · 6–7 B · 4–5 C · 0–3 F (no plan sent).
-           Until Edge Lab proves a setup (n ≥ 30), A is capped at B.
+           A only for setups Edge Lab has proven (EDGE_LAB_PROVEN: phase-C reversals); every other setup is capped at B.
   RISK     A 0.5 % · B 0.25 % · C 0.125 % (settled 18 Oct 2026)
   TRANSLATE  MT5 level: same-direction pairs spot × level ÷ future; inverted (6J 6C 6S) spot × future ÷ level.
 """
@@ -36,7 +36,11 @@ TRIG = {  # role → (name, min R/R, stop basis)
 SHORT_NAME = {"Spring": "UTAD", "Shakeout": "UTAD", "Test of the spring": "Test of the UTAD", "LPS": "LPSY",
               "SOS bar": "SOW bar", "BU": "LPSY (back-up)"}
 RISK = {"A": 0.5, "B": 0.25, "C": 0.125, "F": 0.0}
-EDGE_LAB_PROVEN: set = set()          # setups proven in Edge Lab (n ≥ 30, worst case > 0) — none yet
+# Edge Lab v1 (20 Oct 2026, 8 futures 1h+4h): PROVEN = in-sample n ≥ 30, bootstrapped worst case > 0,
+# ≥ 0.1 R above the random-entry baseline, AND the locked hold-out (from 18 Apr 2026, n ≥ 8) also ≥ 0.1 R above it.
+# Only POE 1 (phase-C reversal: Spring · Shakeout · UTAD) passes (results in the private desk repo, edgelab/).
+# SOS/SOW bar, tests, LPS/BU earn about what a random entry in the same direction earns with the Adaptive stop → stay ≤ B.
+EDGE_LAB_PROVEN: set = {"Spring", "Shakeout", "UTAD"}
 
 
 def _round_away(p, tick, side):
@@ -134,7 +138,7 @@ def card(p, fut_now, spot_now, balance=100000.0):
     """Telegram plan card (HTML)."""
     d = lambda x: f"{x:.{max(0, -int(math.floor(math.log10(abs(x)))) + 4)}g}" if x else "—"
     sd = "LONG" if p["side"] == 1 else "SHORT"
-    capped = " (A until Edge Lab proves it)" if p["points"] >= 8 and p["grade"] == "B" else ""
+    capped = " (A only for Edge-Lab-proven setups: Spring · Shakeout · UTAD)" if p["points"] >= 8 and p["grade"] == "B" else ""
     head = f"🎯 <b>{p['key']} {p['tf']} · {sd} · {p['setup']} (phase {p['phase']})</b> · grade <b>{p['grade']}</b> {p['points']}/10{capped}"
     if p["refused"]:
         return head + f"\n⛔ Stop too wide ({abs(p['entry'] - p['stop']):.5g} > cap {p['cap']:.5g} = 1.5 × ATR 4h). " \
