@@ -19,12 +19,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from . import core
+
 LOOKBACK = 50
 MIN_COUNTER = 1
 CHOCH_K = 1.0
 LEG_K = 1.0
-LEG_K0 = 2.0
+LEG_K0 = 1.5
 CLX_EFF = 2.0
+RET_END = 0.618       # a pullback retracing ≥ 61.8 % of the move so far ends it (the next event has begun)…
+RET_ATR = 3.0         # …once the move is ≥ 3 ATR (a small first leg is not a move yet)
 OUTSIDE = 0.25
 
 
@@ -45,7 +49,7 @@ def live_swings(led):
         yield conf, list(cur)
 
 
-def composites(sw, dr):
+def composites(sw, dr, atr=None):
     """Composite swings in direction dr (+1 rallies) by structure: a rally keeps going while every pullback makes a
     HIGHER LOW (holds above the rally's last low); it ends when a pullback breaks that low. Returns the finished ones
     and the live one: (start bar, start price, end bar, end price)."""
@@ -58,7 +62,8 @@ def composites(sw, dr):
             elif (x[4] - cur[3]) * dr > 0:
                 cur[2], cur[3] = x[3], x[4]
         elif cur is not None:
-            if (x[4] - floor) * dr < 0:
+            big = atr is None or (cur[3] - cur[1]) * dr >= RET_ATR * atr[cur[0]]
+            if (x[4] - floor) * dr < 0 or (big and (cur[3] - x[4]) * dr >= RET_END * (cur[3] - cur[1]) * dr):
                 out.append(tuple(cur))
                 cur = None
             else:
@@ -67,15 +72,16 @@ def composites(sw, dr):
 
 
 def detect(h, l, eff, led, need_climax=False, choch_k=CHOCH_K, min_counter=MIN_COUNTER, leg_k=LEG_K, accept=None,
-           spans=None):
+           spans=None, close=None):
     """CHoCH triggers, live. accept(trigger) → True | False | "retry" decides whether a trigger becomes the range in
     force (chain). spans() → [(start, end, low, high)] of the ranges shown so far: swings that start inside a range's
     box (AR, ST, tests) are range action, not counter-moves of the trend, so they are left out of the comparison."""
     out, seen = [], {}
+    atr = core.atr(h, l, (h + l) / 2) if close is None else core.atr(h, l, close)
     for conf, sw in live_swings(led):
         for dr in (1, -1):
             win = sw[-LOOKBACK:]
-            done, cur = composites(win, dr)
+            done, cur = composites(win, dr, atr)
             if cur is None:
                 continue
             a1, p1, a2, p2 = cur
@@ -94,6 +100,8 @@ def detect(h, l, eff, led, need_climax=False, choch_k=CHOCH_K, min_counter=MIN_C
             rallies = [r for r in done if r[0] >= leg_i and r[2] <= a1
                        and not any(b0 <= r[0] <= b1 and lo <= r[1] <= hi for b0, b1, lo, hi in sp)]
             size = (p2 - p1) * dr
+            if (p2 - (h[a1] if dr == 1 else l[a1])) * dr <= 0:
+                continue                     # the reaction has not yet cleared the climax bar itself: no AR yet
             if len(rallies) < min_counter:
                 # a straight leg (no counter-move of its own outside a range): the reaction is trivially the largest —
                 # take it only when the leg is a real trend, at least LEG_K0 × the reaction
@@ -172,5 +180,5 @@ def chain(o, h, l, c, eff, v, led, htf_at=lambda i: 0, **kw):
             sp.append((q["a1"], max(q["a1"] + 1, end), min(rr.support, rr.resistance), max(rr.support, rr.resistance)))
         return sp
 
-    detect(h, l, eff, led, accept=accept, spans=spans, **kw)
+    detect(h, l, eff, led, accept=accept, spans=spans, close=c, **kw)
     return out

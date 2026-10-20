@@ -36,3 +36,18 @@ def test_ar_must_beat_every_earlier_rally():
     lab, h, l, ch = _chain()
     for r, rr in ch:
         assert r["ratio"] > autorange.CHOCH_K
+
+
+def test_deep_pullback_ends_a_big_move():
+    # down 10 → 4 (6 ATR with atr=1), then a rally back to 8.5 (75 %) ends the reaction even though it holds a lower high
+    import numpy as np
+    sw = [(-1, 0, 10.0, 1, 4.0, 2), (1, 1, 4.0, 2, 8.5, 3), (-1, 2, 8.5, 3, 3.0, 4)]
+    done, cur = autorange.composites(sw, -1, np.ones(10))
+    assert done == [(0, 10.0, 1, 4.0)] and cur == [2, 8.5, 3, 3.0]
+
+
+def test_small_first_leg_is_not_ended_by_a_deep_pullback():
+    import numpy as np
+    sw = [(-1, 0, 10.0, 1, 9.0, 2), (1, 1, 9.0, 2, 9.8, 3), (-1, 2, 9.8, 3, 5.0, 4)]
+    done, cur = autorange.composites(sw, -1, np.ones(10))     # 1 ATR first leg: the 80 % pullback does not end it
+    assert done == [] and cur == [0, 10.0, 3, 5.0]

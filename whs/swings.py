@@ -198,11 +198,13 @@ CLIMAX_K = 4.0          # a climactic bar: TR ≥ 4 × ATR[1]
 FOLLOW_G, FOLLOW_N = 0.5, 3   # ...keeps the reference against smaller (< 0.5 × its TR) SBars within 3 bars
 RELEASE_K = 1.5         # while a climactic bar holds the reference, an opposite SBar closing ≥ 1.5 ATR away turns it
 RETEST_FRAC, RETEST_K, RETEST_MIN = 0.9, 1.5, 2.0    # a swing ≥ 2 ATR retested ≥ 90 %, closing ≥ 1.5 ATR away, ends
+DEEP_K = 0.618          # while a climactic bar holds the reference, a CLOSE back ≥ 61.8 % of the swing ends it (20 Oct 2026:
+                        # GC 1D 2 Feb 2026 — the shakeout's 5.5-ATR bar held the reference for a month through a +23 % rally)
 FOLD_ATR, FOLD_RATIO, FOLD_TOL = 1.5, 0.2, 0.25      # a counter-swing < 1.5 ATR and < 0.2 × the next swing folds in
 RULES_V2 = dict(climax_k=CLIMAX_K, follow_g=FOLLOW_G, follow_n=FOLLOW_N, release_k=RELEASE_K,
                 retest_frac=RETEST_FRAC, retest_k=RETEST_K, retest_min=RETEST_MIN,
-                fold_atr=FOLD_ATR, fold_ratio=FOLD_RATIO, fold_tol=FOLD_TOL, shift=True)
-RULES_V1 = dict(climax_k=0.0, follow_g=0.0, follow_n=0, release_k=0.0, retest_frac=0.0, retest_k=0.0,
+                fold_atr=FOLD_ATR, fold_ratio=FOLD_RATIO, fold_tol=FOLD_TOL, shift=True, deep_k=DEEP_K)
+RULES_V1 = dict(deep_k=0.0, climax_k=0.0, follow_g=0.0, follow_n=0, release_k=0.0, retest_frac=0.0, retest_k=0.0,
                 retest_min=0.0, fold_atr=0.0, fold_ratio=0.0, fold_tol=0.0, shift=False)
 
 
@@ -333,7 +335,8 @@ def ledger(o, h, l, c, eff, rules: dict | None = None) -> SwingResult:
                       and away >= R["retest_k"] * atr1[i])
             anchored = has_sb and ref_bar >= 0 and ref_tr >= climax_k * atr1[ref_bar]
             release = R["release_k"] and anchored and with_dir(i, -d) and away >= R["release_k"] * atr1[i]
-            if (broke and travel >= TRAVEL_K * atr1[i]) or retest or release:
+            deep = R.get("deep_k", 0.0) and anchored and size > 0 and away >= R["deep_k"] * size
+            if (broke and travel >= TRAVEL_K * atr1[i]) or retest or release or deep:
                 count += 1
                 SW.append(Swing(n=count, direction=d, start_i=s_i, start_p=s_p, end_i=x_i, end_p=ext, confirm_i=i,
                                 extent_pct=0.0, bars=0, avg_effort=np.nan))

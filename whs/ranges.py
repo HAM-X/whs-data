@@ -38,6 +38,9 @@ BACK_BARS, SPRING3_ATR, SPRING3_EFF = 3, 1.0, 1.1
 LPS_ZONE = 0.5
 HOLD_TOL, LEAVE_H = 0.2, 0.5
 AR_MAX = 2.0
+AR_RET_END = 0.618    # auto: a pullback retracing ≥ 61.8 % of the AR so far ends the AR (the next event has begun)…
+AR_RET_ATR = 3.0      # …once the AR is ≥ 3 ATR
+SO_ATR, SO_SPEED, SO_EFF = 5.0, 0.5, 2.0   # shakeout after a BC: ≥ 5 ATR, ≥ 0.5 ATR per bar, climactic effort ≥ 2×
 CH_FLAT = 0.25        # a channel that moves less than 0.25 H across the range so far is drawn flat
 CH_MAX = 1.0          # ... and one that moves more than 1 H is a trend, not a range: flat too
 B_MIN = 1.0
@@ -451,12 +454,28 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
     sc = add_a("SC" if K == 1 else "BC", a1, S, "candidate", a1)
     ar = add_a("AR", a2, R, "confirmed", a2)
     by_bar = {ci: (dd, si, sp, ei, ep) for (dd, si, sp, ei, ep, ci) in led.done}
+
+    def _shakeout(k1, k2, size):
+        """The reaction from the climax bar k1 to its extreme k2 is a SHAKEOUT: big (≥ SO_ATR × ATR), fast
+        (≥ SO_SPEED ATR per bar on average) and on climactic effort somewhere in it (≥ SO_EFF)."""
+        a = atr[k1] if not np.isnan(atr[k1]) else np.nan
+        if np.isnan(a) or a <= 0 or k2 <= k1:
+            return False
+        e = eff[k1:k2 + 1]
+        e = e[~np.isnan(e)]
+        return size >= SO_ATR * a and size / (k2 - k1) >= SO_SPEED * a and len(e) > 0 and e.max() >= SO_EFF
     ar_open, ar_floor = True, S                         # auto: the AR's composite is still building / its last hold
 
-    def ar_track(sw):
-        nonlocal ar_open, ar_floor
+    ar_hi = S                                           # the AR's extreme as known so far (start-up pass)
+
+    def ar_track(sw, top=None):
+        nonlocal ar_open, ar_floor, ar_hi
+        if ar_open and sw[0] * K == 1 and sw[1] >= a1:
+            ar_hi = max(ar_hi, sw[4] * K)
         if ar_open and sw[0] * K == -1 and sw[1] >= a1:
-            if sw[4] * K < ar_floor:
+            hi = ar_hi if top is None else top
+            deep = hi - S >= AR_RET_ATR * atr[a1] and hi - sw[4] * K >= AR_RET_END * (hi - S)
+            if sw[4] * K < ar_floor or deep:
                 ar_open = False
             else:
                 ar_floor = sw[4] * K
@@ -503,7 +522,7 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
             live[i] = 1
             sw = by_bar.get(i)
             if auto and sw is not None:
-                ar_track(sw)
+                ar_track(sw, R)
             if sw is not None and sw[0] * K == -1 and sw[1] >= a2 and sw[3] > a2:
                 p = sw[4] * K
                 if S - BREAK_TOL * H <= p <= S + ST_ZONE * H:
@@ -511,6 +530,11 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
                     less = not np.isnan(e_k) and not np.isnan(e_c) and e_k <= ST_EFFORT * e_c
                     st = add_a("ST", sw[3], p, "confirmed" if less else "candidate", i,
                                "on less effort than the climax" if less else "on more effort than the climax")
+                    if auto and K == -1 and _shakeout(a1, a2, H):
+                        # BC → SHAKEOUT → AR (WTC S2 p15 / S3 p14, Roman's alternative labelling; AAPL May 2010):
+                        # the fast, climactic drop off the BC is a shakeout, the rally that buys it back is the AR
+                        ar.name, ar.note = "Shakeout", "a fast, climactic drop off the BC, bought back"
+                        st.name, st.note = "AR", "the rally that bought the shakeout back"
                     st.side, st.role = K, "ST"
                     if less:
                         sc.state = "confirmed"

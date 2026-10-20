@@ -74,12 +74,12 @@ def build(o, h, l, c, eff, rr, led) -> Story:
         parts.append(f"{clx.name} on {clx.effort:.1f}×, closed {off:.0f}% off its {lowword}")
     if clx is not None and ar is not None:
         ext = (ar.price / clx.price - 1) * 100
-        parts.append(f"AR {ext:+.2f}% in {ar.bar - clx.bar} bars on {_avg(eff, clx.bar + 1, ar.bar):.1f}×")
+        parts.append(f"{ar.name} {ext:+.2f}% in {ar.bar - clx.bar} bars on {_avg(eff, clx.bar + 1, ar.bar):.1f}×")
     sts = _ev(rr, "ST", side=1 if sc else -1)
     if sts:
         s0 = sts[0]
         cmp_ = "" if clx is None or np.isnan(clx.effort) else (" (less than the climax)" if s0.effort < clx.effort else " (MORE than the climax)")
-        parts.append(f"ST on {s0.effort:.1f}×{cmp_}")
+        parts.append(f"{s0.name} on {s0.effort:.1f}×{cmp_}")
     if parts:
         st.steps.append((1, "A", " · ".join(parts)))
     # ---- #2 phase B ----
