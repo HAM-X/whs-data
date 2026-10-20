@@ -1,7 +1,8 @@
 name: robot-hourly
 
-# Pipdon BOT data robot. Runs 12 minutes past every hour, Sunday to Friday (UTC).
-# Your time is UTC+3, so it runs at hh:12 all day. Saturday is skipped (CME closed).
+# Pipdon BOT data robot. Does the work at hh:12 every hour (UTC+3 too), Sunday to Friday.
+# GitHub's scheduler alone was unreliable (runs 3–7 h apart), so each run loops for ~5h40m and then
+# starts the next run itself (scripts/robot_loop.sh). The cron below is only a backup starter.
 on:
   schedule:
     - cron: "12 * * * 0-5"
@@ -14,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: robot-data
@@ -22,7 +24,7 @@ concurrency:
 jobs:
   download:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,33 +38,22 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt
 
-      - name: Download, store, check health
+      - name: Robot loop (hourly at hh:12 for ~5h40m)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ "${{ github.event.inputs.backfill }}" = "true" ]; then
-            python -m jobs.download --backfill
-          else
-            python -m jobs.download
-          fi
-
-      - name: Save data to the repository
+          FIRST_ARGS: ${{ github.event.inputs.backfill == 'true' && '--backfill' || '' }}
+          LOOP_MINUTES: "340"
         run: |
           git config user.name "pipdon-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data
-          if git diff --cached --quiet; then
-            echo "No new bars."
-            exit 0
-          fi
-          git commit -q -m "data: $(TZ=Africa/Nairobi date '+%a %d %b %H:%M') UTC+3"
-          for i in 1 2 3; do
-            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
-            sleep 5
-          done
-          echo "::error::Could not push data after 3 tries"
-          exit 1
+          bash scripts/robot_loop.sh
+
+      - name: Hand over to the next run
+        if: success() || failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run robot-hourly.yml -R "${{ github.repository }}" --ref main
 
       - name: Tell Hamza if the job itself crashed
         if: failure()
