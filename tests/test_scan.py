@@ -70,4 +70,5 @@ def test_panel_heat_and_persistence():
 def test_edge_lab_proven_setups_may_grade_a():
     from whs import desk
     assert desk.grade_of(9, "Spring") == "A" and desk.grade_of(9, "UTAD") == "A" and desk.grade_of(9, "Shakeout") == "A"
-    assert desk.grade_of(9, "SOS bar") == "B" and desk.grade_of(9, "Test of the spring") == "B"
+    assert desk.grade_of(9, "SOS bar") == "A" and desk.grade_of(9, "SOW bar") == "A"
+    assert desk.grade_of(9, "Test of the spring") == "B" and desk.grade_of(9, "LPS") == "B"

@@ -13,10 +13,11 @@ The robot turns a fresh, confirmed Wyckoff entry event of a live range into a co
   TARGET   phase C entries: first the far edge, then the far edge + range height (measured move);
            phase D entries: the far edge + range height. R/R to the measured move.
   GATES    stop too wide → refused · R/R below the trigger's minimum → not a trade (both reported as one line)
-  GRADE    10 points (Roman's proforma): higher timeframe not against (2) · currency strength agrees (2) ·
-           structure: confirmed entry event (3) · story evidence for the side ≥ 75 % (2, ≥ 50 % 1) ·
-           R/R ≥ the trigger's minimum (1). 8–10 A · 6–7 B · 4–5 C · 0–3 F (no plan sent).
-           A only for setups Edge Lab has proven (EDGE_LAB_PROVEN: phase-C reversals); every other setup is capped at B.
+  GRADE v2  10 points, every check tested in Edge Lab v1b: setup (Spring/Shakeout/UTAD 4 · test, SOS/SOW bar 2 ·
+           LPS/BU 1) · higher timeframe not against (2, +1 if WITH the trade) · story evidence for the side ≥ 75 % (2,
+           ≥ 50 % 1; a phase-C reversal gets 2 — the evidence comes after it) · R/R ≥ the trigger's minimum (1).
+           Currency strength is shown but scores nothing (it did not separate winners). 8–10 A · 6–7 B · 4–5 C ·
+           0–3 F (no plan sent). A only for EDGE_LAB_PROVEN setups.
   RISK     A 0.5 % · B 0.25 % · C 0.125 % (settled 18 Oct 2026)
   TRANSLATE  MT5 level: same-direction pairs spot × level ÷ future; inverted (6J 6C 6S) spot × future ÷ level.
 """
@@ -40,7 +41,9 @@ RISK = {"A": 0.5, "B": 0.25, "C": 0.125, "F": 0.0}
 # ≥ 0.1 R above the random-entry baseline, AND the locked hold-out (from 18 Apr 2026, n ≥ 8) also ≥ 0.1 R above it.
 # Only POE 1 (phase-C reversal: Spring · Shakeout · UTAD) passes (results in the private desk repo, edgelab/).
 # SOS/SOW bar, tests, LPS/BU earn about what a random entry in the same direction earns with the Adaptive stop → stay ≤ B.
-EDGE_LAB_PROVEN: set = {"Spring", "Shakeout", "UTAD"}
+EDGE_LAB_PROVEN: set = {"Spring", "Shakeout", "UTAD", "SOS bar", "SOW bar"}   # may reach A (SOS/SOW bar only with the HTF WITH
+# it + strong story + R/R: Edge Lab v1b, 36 such trades ≈ +1.9 R in both periods); tests and LPS/BU stay ≤ B
+SETUP_PTS = {"Spring": 4, "Shakeout": 4, "Test": 2, "BO": 2, "BU": 1, "Chain": 1, "D_LPS": 1}
 
 
 def _round_away(p, tick, side):
@@ -101,19 +104,26 @@ def plans(key, tf, h, l, c, rr, st, atr1h, atr4h, tick, htf, strength_rank, n_re
         t1 = hi_edge if side == 1 else lo_edge
         t2 = hi_edge + H if side == 1 else lo_edge - H
         rr_mm = (t2 - entry) * side / dist if dist > 0 else 0.0
-        # grade
+        # grade v2 (Edge Lab v1b, 20 Oct 2026: every check tested as of the entry bar on 634 trades; currency strength
+        # did NOT separate winners — reversals come against the recent move — so it is information only now)
         pts, why = 0, []
+        sp = SETUP_PTS.get(e.role, 0)
+        pts += sp
+        why.append(f"{name} confirmed · setup {sp}/4 (Edge Lab)")
         if htf != -side:
             pts += 2
             why.append("higher timeframe not against")
-        if strength_rank is not None and strength_rank * side > 0:
-            pts += 2
-            why.append("currency strength agrees")
-        pts += 3
-        why.append(f"{name} confirmed")
+            if htf == side:
+                pts += 1
+                why.append("higher timeframe WITH the trade (+1)")
+        if strength_rank is not None:
+            why.append("currency strength " + ("agrees" if strength_rank * side > 0 else "against") + " (info only)")
         ev_for, ev_ag = (len(rr.bull), len(rr.bear)) if side == 1 else (len(rr.bear), len(rr.bull))
         share = ev_for / max(1, ev_for + ev_ag)
-        if share >= 0.75:
+        if phase_c and e.role != "Test":
+            pts += 2
+            why.append("phase-C reversal: evidence comes after it (2)")
+        elif share >= 0.75:
             pts += 2
             why.append(f"story evidence {ev_for} of {ev_for + ev_ag}")
         elif share >= 0.5:
@@ -138,7 +148,7 @@ def card(p, fut_now, spot_now, balance=100000.0):
     """Telegram plan card (HTML)."""
     d = lambda x: f"{x:.{max(0, -int(math.floor(math.log10(abs(x)))) + 4)}g}" if x else "—"
     sd = "LONG" if p["side"] == 1 else "SHORT"
-    capped = " (A only for Edge-Lab-proven setups: Spring · Shakeout · UTAD)" if p["points"] >= 8 and p["grade"] == "B" else ""
+    capped = " (A only for Spring · Shakeout · UTAD · SOS/SOW bar)" if p["points"] >= 8 and p["grade"] == "B" else ""
     head = f"🎯 <b>{p['key']} {p['tf']} · {sd} · {p['setup']} (phase {p['phase']})</b> · grade <b>{p['grade']}</b> {p['points']}/10{capped}"
     if p["refused"]:
         return head + f"\n⛔ Stop too wide ({abs(p['entry'] - p['stop']):.5g} > cap {p['cap']:.5g} = 1.5 × ATR 4h). " \
