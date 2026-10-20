@@ -152,5 +152,5 @@ def card(p, fut_now, spot_now, balance=100000.0):
         lt = lots(p["key"], p["entry"], p["stop"], fut_now, spot_now, balance * risk / 100) if risk else 0
         lines.append(f"MT5 {sym} {act}: entry {e5:.{nd}f} · stop {s5:.{nd}f} → <b>{lt:.2f} lots</b> per ${balance:,.0f} at {risk}%")
     lines.append(f"<i>why: {'; '.join(p['why'])}</i>")
-    lines.append(f"<i>/size {p['key']} {p['entry']:.6g} {p['stop']:.6g} {p['grade']} &lt;balance&gt; · manage: ⅓ at 2R, BE once BU holds, SBar staircase</i>")
+    lines.append(f"<i>/size {p['key']} {p['entry']:.6g} {p['stop']:.6g} {p['grade']} &lt;balance&gt; · manage: ⅓ at 2R · Adaptive stop (SBar true-range lows; from +1R the structure stop; climactic bar → ½)</i>")
     return "\n".join(lines)

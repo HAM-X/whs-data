@@ -121,8 +121,8 @@ export function openTrade(st, snap, args, now = Date.now(), panel = null) {
               lastDone: null, third: false, be: false, best: 0, bars: 0, timeWarned: false };
   st.trades.push(t);
   return `📒 <b>Opened ${k} ${side === 1 ? "LONG" : "SHORT"}</b> ${p6(entry)} · stop ${p6(stop)} · 1R = ${p6(R)} · grade ${grade} ${t.risk}%\n` +
-    `Plan: ⅓ off at 2R ${p6(entry + 2 * side * R)} · stop to breakeven after a close beyond +1R ${p6(entry + side * R)} · ` +
-    `then the SBar staircase (each new SBar's ${side === 1 ? "low" : "high"} ∓ 2 pips) · reversal bar against → exit · 48 bars without +1R → time stop.\n` +
+    `Plan: ⅓ off at 2R ${p6(entry + 2 * side * R)} · ADAPTIVE stop: each SBar commitment → its true-range ${side === 1 ? "low" : "high"}, ` +
+    `after +1R a climactic bar → ½ of it · reversal bar against → exit · 48 bars without +1R → time stop.\n` +
     (gd.state === "REDUCE" ? "🟠 " + gd.why.join(" · ") + "\n" : "") + guardText(st, 0, now, panel ? { rho: panel.themes?.rho } : {});
 }
 
@@ -178,20 +178,28 @@ export function manage(st, snap, now = Date.now()) {
         t.third = true;
         out.push(`💰 ${tag}: 2R reached ${p6(t.entry + 2 * side * t.R)} — take ⅓ off.`);
       }
-      // 3) breakeven after a close beyond +1R
-      if (!t.be && rNow(t, cl) >= 1) {
-        t.be = true;
-        if ((t.entry - t.stop) * side > 0) {
-          t.stop = t.entry;
-          out.push(`🔒 ${tag}: closed beyond +1R — stop to breakeven ${p6(t.entry)}.`);
-        }
-      }
-      // 4) SBar staircase
+      // 3) ADAPTIVE stop (the Trade Desk's, approved 20 Oct 2026): every SBar commitment in our direction → its
+      //    TRUE-RANGE low/high (combo pair: the pair's); after +1R a climactic bar in our direction → ½ of that bar.
+      //    Never loosens, and only when the close is beyond the new stop.
+      const pc = i > 0 ? b.c[i - 1] : cl;
+      const trLo = Math.min(lo, pc), trHi = Math.max(hi, pc);
+      const cands = [];
       if (Math.sign(b.sb[i]) === side) {
-        const ns = side === 1 ? lo - off : hi + off;
+        let lv = side === 1 ? trLo : trHi;
+        if (Math.abs(b.sb[i]) === 2 && i > 0) {
+          const pc2 = i > 1 ? b.c[i - 2] : b.c[i - 1];
+          lv = side === 1 ? Math.min(lv, b.l[i - 1], pc2) : Math.max(lv, b.h[i - 1], pc2);
+        }
+        cands.push([lv, "SBar commitment → its true-range " + (side === 1 ? "low" : "high")]);
+        const a1c = i > 0 ? b.atr[i - 1] : null;
+        if (t.best >= 1 && b.e[i] != null && b.e[i] >= 2.5 && a1c && trHi - trLo >= 2 * a1c)
+          cands.push([(trHi + trLo) / 2, "climactic bar after +1R → ½ of it"]);
+      }
+      for (const [lv, why] of cands) {
+        const ns = Math.round(lv / inst.tick) * inst.tick;
         if ((ns - t.stop) * side > 0 && (cl - ns) * side > 0) {
-          t.stop = Math.round(ns / inst.tick) * inst.tick;
-          out.push(`🪜 ${tag}: new SBar — stop to ${p6(t.stop)} (${fx(rNow(t, t.stop))}R locked).`);
+          t.stop = ns;
+          out.push(`🪜 ${tag}: ${why} — stop to ${p6(t.stop)} (${fx(rNow(t, t.stop))}R locked).`);
         }
       }
       // 5) reversal bar against

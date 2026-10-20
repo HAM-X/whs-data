@@ -8,17 +8,17 @@ const B = (rows) => ({ t: rows.map((r) => r[0]), o: rows.map((r) => r[1]), h: ro
   c: rows.map((r) => r[4]), e: rows.map((r) => r[5] ?? 1), sb: rows.map((r) => r[6] ?? 0), rb: rows.map((r) => r[7] ?? 0),
   atr: rows.map(() => 0.0013) });
 
-test("Roman's worked example: SBar staircase, then 2R", () => {
+test("Adaptive stop: SBar commitment → its true-range low, then 2R", () => {
   const st = emptyState();
   const snap = { instruments: { "6E": inst(B([])) } };
   openTrade(st, snap, ["6E", "long", "1.0909", "1.0889", "B"], T0);
   snap.instruments["6E"].bars1h = B([
     ["2026-08-03T12:00:00.000Z", 1.0909, 1.0915, 1.0905, 1.0912],
-    ["2026-08-03T16:00:00.000Z", 1.0915, 1.0935, 1.0923, 1.0933, 2.0, 1],   // SBar low 1.0923 → stop 1.0921
+    ["2026-08-03T16:00:00.000Z", 1.0915, 1.0935, 1.0923, 1.0933, 2.0, 1],   // SBar: true-range low = prev close 1.0912 → stop
     ["2026-08-03T18:00:00.000Z", 1.0933, 1.0949, 1.0930, 1.0945],          // high 1.0949 = 2R
   ]);
   const out = manage(st, snap, T0 + 7 * 3600e3);
-  assert.ok(out.some((x) => x.includes("stop to 1.0921")), out.join("\n"));
+  assert.ok(out.some((x) => x.includes("stop to 1.0912")), out.join("\n"));
   assert.ok(out.some((x) => x.includes("2R reached")));
   assert.ok(out.some((x) => x.includes("breakeven")) || st.trades[0].stop > 1.0909);
   assert.equal(manage(st, snap, T0 + 8 * 3600e3).length, 0);           // nothing twice
