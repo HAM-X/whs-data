@@ -420,8 +420,11 @@ class _Side:
         return j, self.h[j]
 
 
-def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int = 24) -> RangeRead:
-    """Bar by bar, using only what was known on each bar (swings as finished on their reversal bar)."""
+def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int = 24, auto: bool = False) -> RangeRead:
+    """Bar by bar, using only what was known on each bar (swings as finished on their reversal bar).
+    auto (WHS Range Auto): the AR is the composite reaction from the climax — it extends through pullbacks that hold
+    (higher lows after an SC); once a pullback breaks that structure the AR is final, and a close beyond it by the
+    break tolerance before any ST means the reaction kept going: no range."""
     o, h, l, c, eff, vol = (np.asarray(x, float) for x in (o, h, l, c, eff, vol))
     n = len(c)
     led = swings.ledger(o, h, l, c, eff)
@@ -446,6 +449,19 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
     sc = add_a("SC" if K == 1 else "BC", a1, S, "candidate", a1)
     ar = add_a("AR", a2, R, "confirmed", a2)
     by_bar = {ci: (dd, si, sp, ei, ep) for (dd, si, sp, ei, ep, ci) in led.done}
+    ar_open, ar_floor = True, S                         # auto: the AR's composite is still building / its last hold
+
+    def ar_track(sw):
+        nonlocal ar_open, ar_floor
+        if ar_open and sw[0] * K == -1 and sw[1] >= a1:
+            if sw[4] * K < ar_floor:
+                ar_open = False
+            else:
+                ar_floor = sw[4] * K
+
+    if auto:
+        for ci in sorted(k for k in by_bar if k <= b2):
+            ar_track(by_bar[ci])
     live = np.zeros(n, int)
     live[b2] = 1
     b_start = None
@@ -461,7 +477,13 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
     for i in range(b2 + 1, n):
         if b_start is None:
             # ---- phase A (in the climax frame)
-            if hK[i] > R:
+            if auto and not ar_open and cK[i] > R + BREAK_TOL * H:
+                ar.state, ar.note = "failed", "the reaction kept going: no range, the trend turned"
+                sc.state = "failed"
+                live[i] = 1
+                end = i
+                break
+            if hK[i] > R and (ar_open or not auto):
                 if hK[i] - S > AR_MAX * H0:
                     ar.state, ar.note = "failed", "the reaction kept going: no range, the trend turned"
                     sc.state = "failed"
@@ -477,6 +499,8 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
                 break
             live[i] = 1
             sw = by_bar.get(i)
+            if auto and sw is not None:
+                ar_track(sw)
             if sw is not None and sw[0] * K == -1 and sw[1] >= a2 and sw[3] > a2:
                 p = sw[4] * K
                 if S - BREAK_TOL * H <= p <= S + ST_ZONE * H:

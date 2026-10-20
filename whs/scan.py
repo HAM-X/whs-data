@@ -2,10 +2,10 @@
 
 For each future and timeframe:
   1. effort, the swing ledger (minor swings) and major swings (whs/degrees.py)
-  2. every climax-stopped sideways box of the major degree becomes an AUTOMATIC RANGE:
-       ① = the climax extreme (the box's start), ② = the reaction extreme (the top of the automatic rally after a
-       selling climax, the bottom of the reaction after a buying climax)
-     and is read live with the two-sided range reader (whs/ranges.py) and its Wyckoff Story (whs/story.py)
+  2. AUTOMATIC RANGES by the change of character (whs/autorange.py, the same rule as WHS Range Auto): after a
+     climax the automatic reaction is bigger than every earlier reaction of the trend in its direction —
+       ① = the climax, ② = the AR (extends while its pullbacks hold)
+     each read live with the two-sided range reader (whs/ranges.py) and its Wyckoff Story (whs/story.py)
   3. what changed since the last run becomes Telegram alerts (major swing events, range events, phases,
      breakouts confirmed / back in the range / left the range)
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from . import core, degrees, desk, ranges, story, swings
+from . import autorange, core, degrees, desk, ranges, story, swings
 from .config import EXCHANGE_TZ, FUTURES
 
 TF_MIN = {"1h": 60, "4h": 240}
@@ -71,15 +71,20 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None, ctx: dict 
                         "protected": None if np.isnan(mr.protected[-1]) else float(mr.protected[-1]),
                         "box": None if live.direction else [float(live.lo), float(live.hi)]}
     out["major_events"] = [(t.iloc[b].isoformat(), txt) for b, txt in mr.events]
-    for a1, a2, kind, box_live in auto_anchors(h, l, mr, n, RECENT[tf]):
-        try:
-            rr = ranges.read(o, h, l, c, eff, v, a1, a2, htf=htf_at(htf_bars, t.iloc[a1]))
-        except Exception as e:      # one odd range must never stop the scan
-            print(f"[range error] {tf} {t.iloc[a1]}: {type(e).__name__}: {e}")
+    try:
+        chain = autorange.chain(o, h, l, c, eff, v, led, htf_at=lambda i: htf_at(htf_bars, t.iloc[i]))
+    except Exception as e:          # one odd chart must never stop the scan
+        print(f"[auto range error] {tf}: {type(e).__name__}: {e}")
+        chain = []
+    for trig, rr in chain[-3:]:
+        a1 = trig["a1"]
+        a2 = next(e.bar for e in rr.events if e.name == "AR")
+        if a1 < n - RECENT[tf]:
             continue
         ph = rr.phases[-1][0] if rr.phases else "A"
-        if not rr.events or rr.left or (not box_live and ph == "A"):
-            continue                 # no range · already over · a box price left before it built any cause
+        failed = any(e.role in ("SC", "BC") and e.state == "failed" for e in rr.events)
+        if not rr.events or rr.left or failed:
+            continue                 # already over · the reaction kept going / the climax gave way (no range)
         st = story.build(o, h, l, c, eff, rr, led)
         if ctx:
             try:
