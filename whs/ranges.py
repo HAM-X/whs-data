@@ -420,7 +420,8 @@ class _Side:
         return j, self.h[j]
 
 
-def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int = 24, auto: bool = False) -> RangeRead:
+def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int = 24, auto: bool = False,
+         kind: str | None = None) -> RangeRead:
     """Bar by bar, using only what was known on each bar (swings as finished on their reversal bar).
     auto (WHS Range Auto): the AR is the composite reaction from the climax — it extends through pullbacks that hold
     (higher lows after an SC); once a pullback breaks that structure the AR is final, and a close beyond it by the
@@ -431,7 +432,8 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
     sb = swings.sbars(o, h, l, c)
     atr = core.atr(h, l, c)
     b2 = a2                                             # the second click; the walk starts after it
-    kind = "SC" if l[a1] <= l[a2] and h[a2] >= h[a1] else "BC"
+    if kind is None:
+        kind = "SC" if l[a1] <= l[a2] and h[a2] >= h[a1] else "BC"
     K = 1 if kind == "SC" else -1                       # the frame in which the climax is the low
     hK, lK, cK = (h, l, c) if K == 1 else (-l, -h, -c)
     S = lK[a1]
@@ -459,9 +461,10 @@ def read(o, h, l, c, eff, vol, a1: int, a2: int, htf: int = 0, profile_rows: int
             else:
                 ar_floor = sw[4] * K
 
-    if auto:
-        for ci in sorted(k for k in by_bar if k <= b2):
-            ar_track(by_bar[ci])
+    if auto:                                            # the list as the indicator holds it on the start bar
+        snap = [lst for ci, lst in getattr(led, "live", []) if ci <= b2]
+        for sw in (snap[-1] if snap else []):
+            ar_track(sw)
     live = np.zeros(n, int)
     live[b2] = 1
     b_start = None

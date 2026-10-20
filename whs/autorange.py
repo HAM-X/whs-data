@@ -29,6 +29,11 @@ OUTSIDE = 0.25
 
 
 def live_swings(led):
+    """(confirm bar, the swing list exactly as the indicator holds it on that RBar — after shift and fold)."""
+    if getattr(led, "live", None):
+        for conf, lst in led.live:
+            yield conf, list(lst)
+        return
     cur = []
     for d in led.done:
         dr, s_i, s_p, e_i, e_p, conf = d
@@ -85,7 +90,7 @@ def detect(h, l, eff, led, need_climax=False, choch_k=CHOCH_K, min_counter=MIN_C
             ext_ok = all((x[4] - p1) * dr >= -1e-12 for x in before if x[3] >= leg_i and x[0] == -dr)
             if not ext_ok:
                 continue
-            sp = spans() if spans else []
+            sp = spans(conf) if spans else []
             rallies = [r for r in done if r[0] >= leg_i and r[2] <= a1
                        and not any(b0 <= r[0] <= b1 and lo <= r[1] <= hi for b0, b1, lo, hi in sp)]
             size = (p2 - p1) * dr
@@ -109,6 +114,7 @@ def detect(h, l, eff, led, need_climax=False, choch_k=CHOCH_K, min_counter=MIN_C
             seen[(a1, dr)] = ok
             if ok is True:
                 out.append(r)
+                break
     return out
 
 
@@ -121,11 +127,12 @@ def chain(o, h, l, c, eff, v, led, htf_at=lambda i: 0, **kw):
     out = []
 
     def accept(r):
-        k = r["conf"] + 1
+        k = r["conf"]                 # the indicator decides before its reader walks the trigger bar
         if out:
             q, _ = out[-1]
             try:
-                now = ranges.read(o[:k], h[:k], l[:k], c[:k], eff[:k], v[:k], q["a1"], q["a2"], htf=q["htf"], auto=True)
+                now = ranges.read(o[:k], h[:k], l[:k], c[:k], eff[:k], v[:k], q["a1"], q["conf"], htf=q["htf"], auto=True,
+                                  kind=q["kind"])
                 failed = any(e.role in ("SC", "BC") and e.state == "failed" for e in now.events)
                 if not now.left and not failed:
                     lo, hi = min(now.support, now.resistance), max(now.support, now.resistance)
@@ -146,17 +153,24 @@ def chain(o, h, l, c, eff, v, led, htf_at=lambda i: 0, **kw):
                 pass
         r["htf"] = htf_at(r["a1"])
         try:
-            rr = ranges.read(o, h, l, c, eff, v, r["a1"], r["a2"], htf=r["htf"], auto=True)
+            rr = ranges.read(o, h, l, c, eff, v, r["a1"], r["conf"], htf=r["htf"], auto=True, kind=r["kind"])
         except Exception:
             return False
         out.append((r, rr))
         return True
 
-    def spans():
-        # a range that died in phase A (the reaction kept going / the climax gave way) was no range: its swings
-        # stay counter-moves of the trend
-        return [(q["a1"], max(q["a1"] + 1, rr.box_end or rr.end), min(rr.support, rr.resistance),
-                 max(rr.support, rr.resistance)) for q, rr in out if any(p[0] != "A" for p in rr.phases)]
+    def spans(now):
+        """Ranges already shown, as the indicator knows them on bar `now`: past ones that reached phase B (until they
+        ended or were replaced) and the one in force once it reached phase B (until now). Flat levels."""
+        sp = []
+        for j, (q, rr) in enumerate(out):
+            nxt = out[j + 1][0]["conf"] if j + 1 < len(out) else None
+            upto = min(now, nxt) if nxt is not None else now
+            if rr.live is None or upto >= len(rr.live) or rr.live[upto] < 2:
+                continue
+            end = min(upto, rr.box_end or rr.end) if (rr.box_end or rr.end) else upto
+            sp.append((q["a1"], max(q["a1"] + 1, end), min(rr.support, rr.resistance), max(rr.support, rr.resistance)))
+        return sp
 
     detect(h, l, eff, led, accept=accept, spans=spans, **kw)
     return out

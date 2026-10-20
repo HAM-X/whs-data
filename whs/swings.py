@@ -149,6 +149,9 @@ class Swing:
                 f"R{ratio_band(self.r_vs_prev)} {de}{ratio_band(self.e_vs_prev)}")
 
 
+LIVE_N = 64                       # swings kept per live snapshot (WHS Range Auto looks back 50)
+
+
 @dataclass
 class SwingResult:
     swings: list = field(default_factory=list)
@@ -158,6 +161,7 @@ class SwingResult:
     seq: np.ndarray = None        # ±1 on the RBar of the BLUE swing that completes a sequence
     done_ext: np.ndarray = None   # extent % of the swing as finished on that RBar (after shift/fold) — what Pine prints
     done: list = field(default_factory=list)   # (dir, start_i, start_p, end_i, end_p, confirm bar) as known on each RBar
+    live: list = field(default_factory=list)   # (confirm bar, last LIVE_N swings of the list after shift/fold) = Pine's arrays
 
 
 def classify(sw: "Swing", st: dict) -> None:
@@ -343,6 +347,8 @@ def ledger(o, h, l, c, eff, rules: dict | None = None) -> SwingResult:
                 res.tl[i], res.seq[i] = sw.tl, sw.seq
                 res.done_ext[i] = sw.extent_pct
                 res.done.append((sw.direction, sw.start_i, sw.start_p, sw.end_i, sw.end_p, i))
+                res.live.append((i, tuple((x.direction, x.start_i, x.start_p, x.end_i, x.end_p, x.confirm_i)
+                                          for x in SW[-LIVE_N:])))
                 rbar[i] = -d
                 # new swing in the opposite direction starts at the old extreme
                 d = -d
