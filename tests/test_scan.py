@@ -54,3 +54,14 @@ def test_trade_desk_stop_translate_and_grade():
     assert desk.lots("6E", 1.0909, 1.0889, 1.0909, 1.0874, 500) == 2.5
     assert desk.grade_of(9, "BU") == "B"          # A stays capped at B until Edge Lab proves the setup
     assert desk.grade_of(5, "BU") == "C" and desk.grade_of(3, "BU") == "F"
+
+
+def test_panel_heat_and_persistence():
+    from whs import panel
+    rho = {"6E": {"6B": 0.78, "6C": 0.55}, "6B": {"6E": 0.78, "6C": 0.5}, "6C": {"6E": 0.55, "6B": 0.5}}
+    assert abs(panel.effective_heat({"6E": 0.5, "6B": 0.5, "6C": 0.5}, rho) - 1.29) < 0.01
+    st = {w: [{"ccy": c} for c in order] for w, order in
+          (("1h", "JPY CHF EUR GBP USD AUD NZD CAD".split()), ("1d", "JPY EUR CHF GBP USD AUD CAD NZD".split()),
+           ("1w", "CHF JPY EUR USD GBP AUD NZD CAD".split()))}
+    p = panel.persistence(st)
+    assert p["JPY"].startswith("strong") and p["CAD"].startswith("weak")

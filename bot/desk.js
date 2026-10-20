@@ -3,7 +3,14 @@
 // Everything is in % of the account and in R, so it works for any account size (prop or live).
 
 export const RISK = { A: 0.5, B: 0.25, C: 0.125 };     // % of balance (settled 18 Oct 2026)
-export const OWN = { day: 2.5, ddHalf: 6, ddStop: 8, heat: 1.5, lossesDay: 2, streak: 4 };
+export const OWN = { day: 2.5, ddHalf: 6, ddStop: 8, heat: 1.5, theme: 0.75, lossesDay: 2, streak: 4 };
+
+// effective heat √(Σ Σ wᵢ wⱼ ρᵢⱼ) of signed positions (+ = long the future = short USD), ρ from the Market Panel
+export function effHeat(pos, rho) {
+  let s = 0;
+  for (const a of pos) for (const b of pos) s += a.w * b.w * (a.key === b.key ? 1 : (rho?.[a.key]?.[b.key] ?? 0));
+  return Math.sqrt(Math.max(0, s));
+}
 const MAX_JOURNAL = 300;
 
 export const emptyState = () => ({ trades: [], journal: [], pnl: null, dd: 0, limits: { day: 5, dd: 10 }, alerts: [] });
@@ -23,7 +30,7 @@ export async function save(env, st) {
 export const openRisk = (t) => Math.max(0, ((t.entry - t.stop) * t.side) / t.R) * t.risk;
 export const rNow = (t, price) => ((price - t.entry) * t.side) / t.R;
 
-export function guard(st, addRisk = 0, now = Date.now()) {
+export function guard(st, addRisk = 0, now = Date.now(), ctx = {}) {
   const today = localDay(now);
   const day = st.pnl && st.pnl.day === today ? st.pnl.pct : 0;
   const open = st.trades.reduce((a, t) => a + openRisk(t), 0);
@@ -39,23 +46,48 @@ export function guard(st, addRisk = 0, now = Date.now()) {
     `Account vs start: ${fx(st.dd || 0)}% · room to the firm's −${lim.dd}%: ${(lim.dd - ddLoss).toFixed(2)}%`,
     `Losses today ${losses}/${OWN.lossesDay} · losing streak ${streak}`,
   ];
-  let state = "OK TO EXECUTE", factor = 1, why = [];
+  let state = "OK TO EXECUTE", factor = 1;
+  const why = [];
   const block = (w) => { state = "BLOCKED"; why.push(w); };
   if (worst <= -lim.day) block(`would breach the firm's daily −${lim.day}%`);
   if (worst <= -OWN.day) block(`would breach your own daily −${OWN.day}%`);
   if (losses >= OWN.lossesDay) block("2 losses today — done for the day");
   if (ddLoss >= OWN.ddStop) block(`account down ${ddLoss.toFixed(2)}% — stop and review (own −${OWN.ddStop}%)`);
   if (lim.dd - ddLoss <= addRisk + open) block("open risk would reach the firm's max drawdown");
+  // themes: correlated positions are one idea (Market Panel ρ, 60 days)
+  const pos = st.trades.map((t) => ({ key: t.key, w: openRisk(t) * t.side })).filter((p) => p.w);
+  if (ctx.key && addRisk) pos.push({ key: ctx.key, w: addRisk * (ctx.side || 1) });
+  let heat = open + addRisk;
+  if (ctx.rho && pos.length) {
+    heat = effHeat(pos, ctx.rho);
+    facts.push(`Effective heat ${heat.toFixed(2)}% (correlations) vs plain sum ${(open + addRisk).toFixed(2)}%`);
+    if (ctx.key) {
+      const bloc = (ctx.blocs || []).find((b) => b.includes(ctx.key)) || [ctx.key];
+      const th = effHeat(pos.filter((p) => bloc.includes(p.key)), ctx.rho);
+      if (bloc.length > 1) facts.push(`Theme ${bloc.join("/")}: ${th.toFixed(2)}% (cap ${OWN.theme}%)`);
+      if (th > OWN.theme + 1e-9 && state !== "BLOCKED") {
+        state = "REDUCE";
+        // largest new size that keeps the theme at the cap
+        let lo = 0, hi = addRisk;
+        for (let i = 0; i < 30; i++) {
+          const m = (lo + hi) / 2;
+          const p2 = pos.slice(0, -1).filter((p) => bloc.includes(p.key)).concat([{ key: ctx.key, w: m * (ctx.side || 1) }]);
+          if (effHeat(p2, ctx.rho) <= OWN.theme) lo = m; else hi = m;
+        }
+        why.push(`same idea as ${bloc.filter((k) => k !== ctx.key).join("/")} — max ${lo.toFixed(2)}% on this one`);
+      }
+    }
+  }
   if (state !== "BLOCKED") {
-    if (open + addRisk > OWN.heat) { state = "REDUCE"; why.push(`heat ${(open + addRisk).toFixed(2)}% > ${OWN.heat}%`); }
+    if (heat > OWN.heat) { state = "REDUCE"; why.push(`heat ${heat.toFixed(2)}% > ${OWN.heat}%`); }
     if (ddLoss >= OWN.ddHalf) { state = "REDUCE"; factor = 0.5; why.push(`account down ${ddLoss.toFixed(2)}% → half risk`); }
     if (streak >= OWN.streak) { state = "REDUCE"; factor = 0.5; why.push(`${streak} losses in a row → half risk until a win`); }
   }
   return { state, factor, why, facts, worst, open };
 }
 
-export function guardText(st, addRisk = 0, now = Date.now()) {
-  const g = guard(st, addRisk, now);
+export function guardText(st, addRisk = 0, now = Date.now(), ctx = {}) {
+  const g = guard(st, addRisk, now, ctx);
   const icon = g.state === "BLOCKED" ? "⛔" : g.state === "REDUCE" ? "🟠" : "🟢";
   return `${icon} <b>Guard: ${g.state}</b>${g.factor < 1 ? " · risk × 0.5" : ""}` + (g.why.length ? "\n" + g.why.map((w) => "• " + w).join("\n") : "") +
     "\n" + g.facts.join("\n") + "\n<i>Update with /pnl −0.4 (today realised %) and /dd 3 (account vs start %).</i>";
@@ -70,7 +102,7 @@ export function pipOffset(inst) {
   return (2 * m.pip * inst.price) / m.spot;
 }
 
-export function openTrade(st, snap, args, now = Date.now()) {
+export function openTrade(st, snap, args, now = Date.now(), panel = null) {
   const [k, dir, e, s, g] = args;
   const inst = snap.instruments[k];
   if (!inst) return "Which instrument?";
@@ -81,7 +113,9 @@ export function openTrade(st, snap, args, now = Date.now()) {
   const grade = String(g || "B").toUpperCase();
   const risk = RISK[grade] ?? parseFloat(grade);
   if (!isFinite(risk) || risk <= 0) return "Grade A, B, C or a risk % like 0.25.";
-  const gd = guard(st, risk, now);
+  const pctx = panel ? { rho: panel.themes?.rho, blocs: panel.themes?.blocs, key: k, side } : {};
+  const gd = guard(st, risk, now, pctx);
+  if (gd.state === "BLOCKED") return guardText(st, risk, now, pctx) + "\n⛔ Not opened.";
   const R = Math.abs(entry - stop);
   const t = { id: now, key: k, side, entry, stop0: stop, stop, R, grade, risk: risk * gd.factor, opened: new Date(now).toISOString(),
               lastDone: null, third: false, be: false, best: 0, bars: 0, timeWarned: false };
@@ -89,7 +123,7 @@ export function openTrade(st, snap, args, now = Date.now()) {
   return `📒 <b>Opened ${k} ${side === 1 ? "LONG" : "SHORT"}</b> ${p6(entry)} · stop ${p6(stop)} · 1R = ${p6(R)} · grade ${grade} ${t.risk}%\n` +
     `Plan: ⅓ off at 2R ${p6(entry + 2 * side * R)} · stop to breakeven after a close beyond +1R ${p6(entry + side * R)} · ` +
     `then the SBar staircase (each new SBar's ${side === 1 ? "low" : "high"} ∓ 2 pips) · reversal bar against → exit · 48 bars without +1R → time stop.\n` +
-    guardText(st, 0, now);
+    (gd.state === "REDUCE" ? "🟠 " + gd.why.join(" · ") + "\n" : "") + guardText(st, 0, now, panel ? { rho: panel.themes?.rho } : {});
 }
 
 export function closeTrade(st, snap, args, now = Date.now()) {
@@ -176,10 +210,10 @@ export function manage(st, snap, now = Date.now()) {
   return out;
 }
 
-export function deskRoute(cmd, args, st, snap, now = Date.now()) {
+export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
   if (!st) return "Trade storage isn't set up yet (Cloudflare KV). It is created on the next bot deploy.";
   switch (cmd) {
-    case "/open": return openTrade(st, snap, args, now);
+    case "/open": return openTrade(st, snap, args, now, panel);
     case "/close": return closeTrade(st, snap, args, now);
     case "/trades": return tradesText(st, snap);
     case "/stop": {
@@ -208,8 +242,11 @@ export function deskRoute(cmd, args, st, snap, now = Date.now()) {
       return `Firm limits set: daily −${d}% · max drawdown −${m}%.`;
     }
     case "/guard": {
-      const g = String(args[0] || "").toUpperCase();
-      return guardText(st, RISK[g] ?? (parseFloat(g) || 0), now);
+      // /guard B  ·  /guard 6E long B  (the second form checks the theme too)
+      let key = null, side = 1, g = String(args[0] || "").toUpperCase();
+      if (snap.instruments[args[0]]) { key = args[0]; side = /^(short|sell|s)$/i.test(args[1] || "") ? -1 : 1; g = String(args[2] || "B").toUpperCase(); }
+      const ctx = panel ? { rho: panel.themes?.rho, blocs: panel.themes?.blocs, key, side } : {};
+      return guardText(st, RISK[g] ?? (parseFloat(g) || 0), now, ctx);
     }
   }
   return null;

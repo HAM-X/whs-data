@@ -84,7 +84,7 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None, ctx: dict 
         if ctx:
             try:
                 out["plans"] += desk.plans(ctx["key"], tf, h, l, c, rr, st, ctx["atr1h"], ctx["atr4h"], ctx["tick"],
-                                           htf_at(htf_bars, t.iloc[-1]), ctx.get("strength"))
+                                           htf_at(htf_bars, t.iloc[-1]), ctx.get("strength"), late=ctx.get("late", False))
             except Exception as e:
                 print(f"[desk error] {ctx['key']} {tf}: {type(e).__name__}: {e}")
         out["ranges"].append({
@@ -105,7 +105,8 @@ def _atr_now(d):
     return float(core.atr(d["high"].to_numpy(float), d["low"].to_numpy(float), d["close"].to_numpy(float))[-1])
 
 
-def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame], strength: list | None = None) -> dict:
+def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame], strength: list | None = None,
+         late: dict | None = None) -> dict:
     """strength: snapshot['strength']['1d'] rows (ccy, vs_usd_pct) — for the Trade Desk grade."""
     res = {}
     vs = {x["ccy"]: x.get("vs_usd_pct") for x in (strength or [])}
@@ -121,7 +122,8 @@ def scan(h1: dict[str, pd.DataFrame], h4: dict[str, pd.DataFrame], strength: lis
             a1, a4 = _atr_now(h1.get(key)), _atr_now(h4.get(key))
             ccy = desk.CCY.get(key)
             srank = vs.get(ccy) if ccy else (-vs["USD"] if key == "GC" and vs.get("USD") is not None else None)
-            ctx = dict(key=key, atr1h=a1, atr4h=a4, tick=FUTURES[key]["tick"], strength=srank) if a1 and a4 else None
+            ctx = dict(key=key, atr1h=a1, atr4h=a4, tick=FUTURES[key]["tick"], strength=srank,
+                       late=bool((late or {}).get(key))) if a1 and a4 else None
             try:
                 res[f"{key} {tf}"] = read_one(d, tf, htf_bars, ctx)
             except Exception as e:

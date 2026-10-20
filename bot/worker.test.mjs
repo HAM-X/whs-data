@@ -76,3 +76,12 @@ test("TradingView alerts become Telegram messages with a flag", () => {
   if (!route("show me the wyckoff story for euro", {}, {}, sc).includes("BIAS")) throw new Error("story words");
   console.log("ok scan commands");
 }
+
+{
+  const { panelReport } = await import("./worker.js");
+  const t = panelReport({ top3: [{ key: "6J", why: ["JPY higher low vs DX (bullish)"] }], persistence: { CAD: "strong (all 3 windows)" },
+    sweet_spot: { dx_high: { at: "2026-10-14T14:00", new_extreme: true, read: { JPY: { dir: 1, text: "higher low — x" } } } },
+    themes: { blocs: [["6E", "6B"]] }, late: { "6E": true } });
+  if (!t.includes("<b>Market Panel</b>") || !t.includes("6E/6B") || !t.includes("JPY higher low")) throw new Error("panel " + t);
+  console.log("ok panel");
+}

@@ -70,7 +70,7 @@ def grade_of(points: int, setup: str) -> str:
     return g
 
 
-def plans(key, tf, h, l, c, rr, st, atr1h, atr4h, tick, htf, strength_rank, n_recent=2):
+def plans(key, tf, h, l, c, rr, st, atr1h, atr4h, tick, htf, strength_rank, n_recent=2, late=False):
     """Plans for the entry events of range read `rr` that became known on the last `n_recent` bars."""
     n = len(c)
     out = []
@@ -118,6 +118,9 @@ def plans(key, tf, h, l, c, rr, st, atr1h, atr4h, tick, htf, strength_rank, n_re
         if rr_mm >= min_rr:
             pts += 1
             why.append(f"R/R {rr_mm:.1f} ≥ {min_rr}")
+        if late and e.role == "BO":                  # Market Panel: ≥ 75 % of the ADR used → a breakout entry is late
+            pts -= 1
+            why.append("LATE: ≥ 75 % of the day's range already used (−1)")
         g = grade_of(pts, name)
         out.append(dict(id=f"{key} {tf} {e.role} {e.bar}", key=key, tf=tf, side=side, setup=name, phase="C" if phase_c else "D",
                         entry=entry, stop=stop, struct=float(struct), t1=float(t1) if phase_c else None, t2=float(t2),

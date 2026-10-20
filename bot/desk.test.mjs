@@ -61,3 +61,16 @@ test("2 pips on the future and close", () => {
   openTrade(st, snap, ["6E", "long", "1.0909", "1.0889", "B"], T0);
   assert.ok(closeTrade(st, snap, ["6E", "1.0949"], T0).includes("+2.00R"));
 });
+
+test("themes: Roman's heat example — 6E, 6B, 6C at 0.5% → effective 1.29%; theme cap trims the third", async () => {
+  const { effHeat, guard } = await import("./desk.js");
+  const rho = { "6E": { "6B": 0.78, "6C": 0.55 }, "6B": { "6E": 0.78, "6C": 0.5 }, "6C": { "6E": 0.55, "6B": 0.5 } };
+  const pos = [{ key: "6E", w: 0.5 }, { key: "6B", w: 0.5 }, { key: "6C", w: 0.5 }];
+  assert.ok(Math.abs(effHeat(pos, rho) - 1.29) < 0.01);
+  assert.ok(Math.abs(effHeat(pos.slice(0, 2), rho) - 0.94) < 0.01);
+  const st = emptyState();
+  st.trades.push({ key: "6E", side: 1, entry: 1.1, stop: 1.099, R: 0.001, risk: 0.5 }, { key: "6B", side: 1, entry: 1.3, stop: 1.299, R: 0.001, risk: 0.5 });
+  const g = guard(st, 0.5, T0, { rho, blocs: [["6E", "6B", "6C"]], key: "6C", side: 1 });
+  assert.equal(g.state, "REDUCE");
+  assert.ok(g.why.some((w) => w.includes("same idea")));
+});

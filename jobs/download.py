@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, brief, desk, health, scan, snapshot, telegram
+from whs import bars, brief, desk, health, panel, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -112,9 +112,15 @@ def write_scan(send=telegram.send) -> None:
         h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
         h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
         snap = json.loads((DATA / "snapshot.json").read_text()) if (DATA / "snapshot.json").exists() else {}
+        late = {k: (v.get("adr_used_pct") or 0) >= panel.LATE for k, v in (snap.get("instruments") or {}).items()}
         res = scan.scan({k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)},
-                        (snap.get("strength") or {}).get("1d"))
+                        (snap.get("strength") or {}).get("1d"), late)
         (DATA / "scan.json").write_text(json.dumps(res, separators=(",", ":"), default=str))
+        try:
+            pn = panel.build(snap, res, {k: v for k, v in h1.items() if len(v)}, {k: v for k, v in h4.items() if len(v)})
+            (DATA / "panel.json").write_text(json.dumps(pn, separators=(",", ":"), default=str))
+        except Exception as e:
+            print(f"[panel error] {type(e).__name__}: {e}")
         sp = DATA / "scan_state.json"
         seen = json.loads(sp.read_text()) if sp.exists() else {}
         plans = scan.fresh_plans(res, seen)
@@ -141,7 +147,8 @@ def write_brief(now, send=telegram.send) -> None:
     try:
         snap = json.loads((DATA / "snapshot.json").read_text())
         sc = json.loads((DATA / "scan.json").read_text())
-        text = brief.build(snap, sc, now)
+        pn = json.loads((DATA / "panel.json").read_text()) if (DATA / "panel.json").exists() else None
+        text = brief.build(snap, sc, now, pn)
         (DATA / "brief.json").write_text(json.dumps({"at": str(now), "text": text}))
         state = load_state()
         local = pd.Timestamp(now).tz_convert(LOCAL_TZ)

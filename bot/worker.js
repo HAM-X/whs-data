@@ -53,6 +53,7 @@ export function help() {
     "/convert 6J 0.0067100 — futures level → MT5 price",
     "/size 6E 1.0909 1.0889 B 100000 — lots for a trade (risk as A/B/C or %, then balance)",
     "/brief — this morning's brief (rebuilt every hour)",
+    "/panel — Market Panel: Top 3, strength persistence, sweet spot vs DX, themes, late",
     "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
     "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
     "/health — is the robot's data fresh?",
@@ -60,7 +61,7 @@ export function help() {
     "<b>Trade Desk</b> (any account size — everything in % and R)",
     "/open 6E long 1.0909 1.0889 B — start managing a trade (future prices, grade or risk %)",
     "/trades · /close 6E [price] · /stop 6E 1.0921",
-    "/guard [B] — OK / REDUCE / BLOCKED · /pnl -0.4 (today %) · /dd 3 (account vs start %) · /limits 5 10",
+    "/guard [6E long] B — OK / REDUCE / BLOCKED (with themes) · /pnl -0.4 (today %) · /dd 3 (account vs start %) · /limits 5 10",
     "",
     "Symbols: 6E 6B 6A 6N 6J 6C 6S GC DX (or euro, pound, aussie, kiwi, yen, cad, franc, gold, dollar).",
   ].join("\n");
@@ -224,7 +225,28 @@ export function storyReport(sc, key, tf) {
     `${p5(g.support)} – ${p5(g.resistance)} · phase ${g.phase}\n\n` +
     g.story.map((x) => esc(x)).join("\n") + `\n\n<b>BIAS</b> ${esc(g.bias)}`;
 }
-export const wantsScan = (text) => /^\/(scan|story|brief)\b|\b(scan|story|wyckoff|range|ranges|brief|morning)\b/i.test(text || "");
+export function panelReport(pn) {
+  if (!pn) return "No Market Panel yet — the robot writes it every hour.";
+  const o = ["<b>Market Panel</b>"];
+  const top = (pn.top3 || []).map((x, i) => `${i + 1}. ${x.key} — ${x.why.join(", ")}`);
+  o.push(top.length ? "Top 3:\n" + top.join("\n") : "Top 3: nothing stands out.");
+  const pers = Object.entries(pn.persistence || {}).map(([c, t]) => `${c} ${t}`);
+  if (pers.length) o.push("Strength: " + pers.join(" · "));
+  for (const [k, lab] of [["dx_high", "DX new major high"], ["dx_low", "DX new major low"]]) {
+    const s = (pn.sweet_spot || {})[k];
+    if (s && s.new_extreme) {
+      const hits = Object.entries(s.read || {}).filter(([, v]) => v.dir).map(([c, v]) => `${c} ${v.text.split(" — ")[0]}`);
+      o.push(`${lab} (${s.at.slice(5, 10)}): ` + (hits.length ? hits.join(" · ") : "no currency held up"));
+    }
+  }
+  const b = (pn.themes || {}).blocs || [];
+  if (b.length) o.push("Themes (one idea each): " + b.map((x) => x.join("/")).join(" · "));
+  const late = Object.entries(pn.late || {}).filter(([, v]) => v).map(([k]) => k);
+  if (late.length) o.push("Late (≥75% ADR): " + late.join(" "));
+  return o.map(esc).join("\n").replace("&lt;b&gt;Market Panel&lt;/b&gt;", "<b>Market Panel</b>");
+}
+
+export const wantsScan = (text) => /^\/(scan|story|brief|panel)\b|\b(scan|story|wyckoff|range|ranges|brief|morning|panel|themes|sweet)\b/i.test(text || "");
 
 // ---------- routing ----------
 export function route(text, snap, env = {}, sc = null) {
@@ -242,6 +264,7 @@ export function route(text, snap, env = {}, sc = null) {
     case "/strength": return strengthReport(snap, ["1h", "1d", "1w"].includes(args[0]) ? args[0] : "1d");
     case "/health": return health(snap);
     case "/scan": return scanReport(sc);
+    case "/panel": return panelReport(sc && sc.__panel);
     case "/brief": return sc && sc.__brief ? sc.__brief : "No brief yet — the robot writes it every hour.";
     case "/story": return need(sym(args[0]), (k) => storyReport(sc, k, args[1] === "1h" ? "1h" : "4h"));
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
@@ -256,6 +279,7 @@ export function route(text, snap, env = {}, sc = null) {
   }
   if (/\b(story|wyckoff)\b/.test(t) && k) return storyReport(sc, k, /\b1h\b/.test(t) ? "1h" : "4h");
   if (/\b(scan|ranges)\b/.test(t) && !k) return scanReport(sc);
+  if (/\b(panel|themes|sweet)\b/.test(t)) return panelReport(sc && sc.__panel);
   if (/\b(brief|morning)\b/.test(t)) return sc && sc.__brief ? sc.__brief : "No brief yet.";
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (/\b(all|overview|market|everything|dashboard|summary)\b/.test(t) && !k) return all(snap);
@@ -276,10 +300,12 @@ async function loadSnapshot(env) {
 async function loadScan(env) {
   const base = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/";
   const q = "?t=" + Math.floor(Date.now() / 120000);
-  const [a, b] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
-                                    fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } })]);
+  const [a, b, c] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
+                                       fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } }),
+                                       fetch(base + "panel.json" + q, { cf: { cacheTtl: 60 } })]);
   const sc = a.ok ? await a.json() : {};
   if (b.ok) sc.__brief = (await b.json()).text;
+  if (c.ok) sc.__panel = await c.json();
   return sc;
 }
 
@@ -335,7 +361,10 @@ export default {
         const st = await loadDesk(env);
         const args = a0.slice();
         if (args[0]) { const k = findSymbol(args[0]); if (k) args[0] = k; }
-        text = deskRoute(dcmd, args, st, snap);
+        const pr = await fetch("https://raw.githubusercontent.com/HAM-X/whs-data/main/data/panel.json?t=" + Math.floor(Date.now() / 120000),
+                               { cf: { cacheTtl: 60 } }).catch(() => null);
+        const panel = pr && pr.ok ? await pr.json().catch(() => null) : null;
+        text = deskRoute(dcmd, args, st, snap, Date.now(), panel);
         if (st) await saveDesk(env, st);
       } catch (e) {
         text = `⚠️ Trade Desk error: ${esc(e.message)}`;

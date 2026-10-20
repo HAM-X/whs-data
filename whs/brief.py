@@ -46,13 +46,13 @@ def score(key: str, r: dict, since: pd.Timestamp) -> tuple[float, list[str]]:
     return pts * tfw, why
 
 
-def build(snap: dict, scan: dict, now=None) -> str:
+def build(snap: dict, scan: dict, now=None, panel: dict | None = None) -> str:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now).tz_convert("UTC")
     since = now - pd.Timedelta(hours=12)
     loc = now.tz_convert("Africa/Nairobi")
     out = [f"☀️ Morning brief · {loc.strftime('%a %d %b')} · data {snap.get('generated_local', '?')} UTC+3"]
-    bad = [k for k, v in (snap.get("health") or {}).items() if isinstance(v, dict) and v.get("problems")]
-    out.append("Data: " + ("⚠️ check " + ", ".join(bad) if bad else "🟢 all feeds fresh"))
+    bad = (snap.get("health") or {}).get("problems") or []
+    out.append("Data: " + ("⚠️ " + "; ".join(bad[:3]) if bad else "🟢 all feeds fresh"))
     # dollar + strength
     dx = (snap.get("instruments") or {}).get("DX") or {}
     dch = (dx.get("day") or {}).get("change_pct")
@@ -61,8 +61,17 @@ def build(snap: dict, scan: dict, now=None) -> str:
         out.append("")
         out.append(f"Dollar {'' if dch is None else f'{dch:+.2f}% today'} · strength (1d): " +
                    " > ".join(x["ccy"] for x in st))
-    # top 3
-    ranked = sorted(((score(k, r, since), k, r) for k, r in scan.items()), key=lambda x: -x[0][0])
+    # top 3: per chart (Wyckoff read), boosted by the Market Panel's instrument score (strength, sweet spot, lateness)
+    pan = {x["key"]: x for x in ((panel or {}).get("ranking") or [])}
+    def total(k, r):
+        pts, why = score(k, r, since)
+        px = pan.get(k.split()[0])
+        if px:
+            extra = [w for w in px["why"] if "range phase" not in w]
+            pts += sum(1.5 for w in extra if "vs DX" in w or "windows" in w) - sum(1 for w in extra if "late" in w)
+            why = why + extra
+        return pts, why
+    ranked = sorted(((total(k, r), k, r) for k, r in scan.items()), key=lambda x: -x[0][0])
     top = [x for x in ranked if x[0][0] > 0][:3]
     out.append("")
     out.append("<b>Top 3 to open</b>" if top else "<b>Top 3</b>: nothing building — trend days, wait for structure.")
@@ -79,6 +88,9 @@ def build(snap: dict, scan: dict, now=None) -> str:
                        (f" · major holds {'above' if m.get('state') == 1 else 'below'} {m['protected']:.5g}"
                         if m.get("protected") is not None and m.get("state") else ""))
         out.append(f"   <i>why: {', '.join(why)}</i>")
+    if panel and panel.get("themes", {}).get("blocs"):
+        out.append("")
+        out.append("Themes (60d ρ ≥ 0.7, trade as ONE idea): " + " · ".join("/".join(b) for b in panel["themes"]["blocs"]))
     # overnight events
     ev = []
     for k, r in scan.items():
