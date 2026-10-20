@@ -111,7 +111,7 @@ jobs:
             {"command":"health","description":"Is the robot data fresh?"},
             {"command":"scan","description":"Every chart: major swing + live Wyckoff ranges"},
             {"command":"story","description":"Wyckoff Story of a chart — /story 6E 4h"},
-            {"command":"brief","description":"This morning's brief"},
+            {"command":"brief","description":"The morning brief (rebuilt hourly)"},
             {"command":"open","description":"Manage a trade — /open 6E long 1.0909 1.0889 B"},
             {"command":"trades","description":"Open trades, R now, stops"},
             {"command":"close","description":"Close a trade — /close 6E [price]"},
