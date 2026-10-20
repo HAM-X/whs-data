@@ -7,3 +7,8 @@ workers_dev = true
 [vars]
 SNAPSHOT_URL = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/snapshot.json"
 XAU_CONTRACT = "100"   # oz per 1.00 lot of XAUUSD on your MT5 master account; change if different
+
+[triggers]
+crons = ["27 * * * *"]   # manage open trades after the robot's hh:12 data run
+
+# [[kv_namespaces]] for DESK is added by the deploy workflow (it creates the namespace once)

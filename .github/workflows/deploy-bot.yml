@@ -47,7 +47,24 @@ jobs:
 
       - name: Test the bot
         if: steps.check.outputs.skip != 'true'
-        run: node --test bot/worker.test.mjs
+        run: node --test bot/worker.test.mjs bot/desk.test.mjs
+
+      - name: Trade Desk storage (Cloudflare KV, created once)
+        if: steps.check.outputs.skip != 'true'
+        working-directory: bot
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100" | jq -r '.result[]? | select(.title=="pipdon-desk") | .id' | head -1)
+          if [ -z "$ID" ]; then
+            ID=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "content-type: application/json" \
+              -d '{"title":"pipdon-desk"}' "$API" | jq -r '.result.id // empty')
+          fi
+          if [ -n "$ID" ]; then
+            printf '\n[[kv_namespaces]]\nbinding = "DESK"\nid = "%s"\n' "$ID" >> wrangler.toml
+            echo "KV ready"
+          else
+            echo "::warning::Could not create the KV namespace (token needs Workers KV Storage: Edit). Trade Desk commands stay off."
+          fi
 
       - name: Deploy to Cloudflare
         if: steps.check.outputs.skip != 'true'
@@ -92,6 +109,15 @@ jobs:
             {"command":"convert","description":"Futures level to MT5 price — /convert 6J 0.0067100"},
             {"command":"size","description":"Lots — /size 6E entry stop A|B|C balance"},
             {"command":"health","description":"Is the robot data fresh?"},
+            {"command":"scan","description":"Every chart: major swing + live Wyckoff ranges"},
+            {"command":"story","description":"Wyckoff Story of a chart — /story 6E 4h"},
+            {"command":"brief","description":"This morning's brief"},
+            {"command":"open","description":"Manage a trade — /open 6E long 1.0909 1.0889 B"},
+            {"command":"trades","description":"Open trades, R now, stops"},
+            {"command":"close","description":"Close a trade — /close 6E [price]"},
+            {"command":"guard","description":"OK / REDUCE / BLOCKED — /guard B"},
+            {"command":"pnl","description":"Today realised % — /pnl -0.4"},
+            {"command":"dd","description":"Account vs start % — /dd 3"},
             {"command":"help","description":"Everything Pipdon BOT can do"}]}' > /dev/null
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \

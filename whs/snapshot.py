@@ -95,6 +95,20 @@ def roll_info(key: str, today: dt.date) -> dict | None:
     return None
 
 
+def manage_bars(d: pd.DataFrame, n: int = 72) -> dict:
+    """Last n hourly bars for trade management in the bot: prices, effort, SBar (±1/±2), RBar (±1), Wilder ATR(14)."""
+    from . import core, swings
+    o, h, l, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+    e = d["eff"].to_numpy(float)
+    sb = swings.sbars(o, h, l, c)
+    rb = swings.ledger(o, h, l, c, e).rbar
+    atr = core.atr(h, l, c)
+    k = slice(max(0, len(d) - n), len(d))
+    f = lambda a, nd=6: [None if pd.isna(x) else round(float(x), nd) for x in a[k]]
+    return {"t": [x.isoformat() for x in d["time"].iloc[k]], "o": f(o), "h": f(h), "l": f(l), "c": f(c),
+            "e": f(e, 2), "sb": [int(x) for x in sb[k]], "rb": [int(x) for x in rb[k]], "atr": f(atr)}
+
+
 def instrument(key: str, h1: pd.DataFrame, h4: pd.DataFrame | None, spot: pd.DataFrame | None, now) -> dict:
     if h1.empty:
         return {"key": key, "available": False}
@@ -163,6 +177,7 @@ def instrument(key: str, h1: pd.DataFrame, h4: pd.DataFrame | None, spot: pd.Dat
         "adr_used_pct": r(rng / adr * 100, 0) if adr else None,
         "recent": [bar(x) for _, x in d.tail(6).iloc[::-1].iterrows()],
         "roll": roll_info(key, pd.Timestamp(now).tz_convert(EXCHANGE_TZ).date()),
+        "bars1h": manage_bars(d),
     }
     if key in MT5 and spot is not None and len(spot):
         sym, direction = MT5[key]

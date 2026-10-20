@@ -1,3 +1,5 @@
+import { deskRoute, DESK_CMDS, load as loadDesk, save as saveDesk, manage } from "./desk.js";
+
 // Pipdon BOT — Telegram command bot on Cloudflare Workers (no AI; every answer is computed).
 // Reads the robot's hourly snapshot (data/snapshot.json in HAM-X/whs-data) and answers only Hamza's chat.
 
@@ -54,6 +56,11 @@ export function help() {
     "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
     "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
     "/health — is the robot's data fresh?",
+    "",
+    "<b>Trade Desk</b> (any account size — everything in % and R)",
+    "/open 6E long 1.0909 1.0889 B — start managing a trade (future prices, grade or risk %)",
+    "/trades · /close 6E [price] · /stop 6E 1.0921",
+    "/guard [B] — OK / REDUCE / BLOCKED · /pnl -0.4 (today %) · /dd 3 (account vs start %) · /limits 5 10",
     "",
     "Symbols: 6E 6B 6A 6N 6J 6C 6S GC DX (or euro, pound, aussie, kiwi, yen, cad, franc, gold, dollar).",
   ].join("\n");
@@ -296,6 +303,16 @@ export function tvMessage(body) {
 }
 
 export default {
+  // hourly, after the robot's hh:12 run has committed fresh bars: manage open trades
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => {
+      const st = await loadDesk(env);
+      if (!st || !st.trades.length) return;
+      const lines = manage(st, await loadSnapshot(env));
+      await saveDesk(env, st);
+      if (lines.length) await reply(env, env.TELEGRAM_CHAT_ID, "<b>Trade Desk</b>\n" + lines.map(esc).join("\n"));
+    })());
+  },
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (request.method === "POST" && path.startsWith("/tv/")) {
@@ -310,6 +327,22 @@ export default {
     if (!msg || !msg.text) return new Response("ok");
     if (String(msg.chat.id) !== String(env.TELEGRAM_CHAT_ID)) return new Response("ok");   // only Hamza
     let text;
+    const [c0, ...a0] = msg.text.trim().split(/\s+/);
+    const dcmd = c0.toLowerCase().replace(/@.*$/, "");
+    if (DESK_CMDS.includes(dcmd)) {
+      try {
+        const snap = await loadSnapshot(env);
+        const st = await loadDesk(env);
+        const args = a0.slice();
+        if (args[0]) { const k = findSymbol(args[0]); if (k) args[0] = k; }
+        text = deskRoute(dcmd, args, st, snap);
+        if (st) await saveDesk(env, st);
+      } catch (e) {
+        text = `⚠️ Trade Desk error: ${esc(e.message)}`;
+      }
+      await reply(env, msg.chat.id, text);
+      return new Response("ok");
+    }
     try {
       const sc = wantsScan(msg.text) ? await loadScan(env).catch(() => null) : null;
       text = route(msg.text, await loadSnapshot(env), env, sc);
