@@ -9,6 +9,7 @@ data/scan.json (major swings, automatic ranges, Story). TradingView stays the pr
            phase C +3 (a test is happening) · D +2 · B +1 · E 0 · new events in the last 12 h +2 ·
            a major-swing event in the last 12 h +1 · 4h counts 1.5× a 1h read
            each with: range name + phase, the Story's bias line, the levels that matter
+  news     red-folder releases next 24 h + how price answered recent ones (whs/news.py)
   overnight  every Wyckoff event of the last 12 h, oldest first
 """
 from __future__ import annotations
@@ -46,7 +47,7 @@ def score(key: str, r: dict, since: pd.Timestamp) -> tuple[float, list[str]]:
     return pts * tfw, why
 
 
-def build(snap: dict, scan: dict, now=None, panel: dict | None = None) -> str:
+def build(snap: dict, scan: dict, now=None, panel: dict | None = None, news_lines: list | None = None) -> str:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now).tz_convert("UTC")
     since = now - pd.Timedelta(hours=12)
     loc = now.tz_convert("Africa/Nairobi")
@@ -91,6 +92,10 @@ def build(snap: dict, scan: dict, now=None, panel: dict | None = None) -> str:
     if panel and panel.get("themes", {}).get("blocs"):
         out.append("")
         out.append("Themes (60d ρ ≥ 0.7, trade as ONE idea): " + " · ".join("/".join(b) for b in panel["themes"]["blocs"]))
+    # Stage 6: red-folder news next 24 h (blackout ±60 min) + how price answered yesterday's releases
+    if news_lines:
+        out.append("")
+        out += news_lines
     # overnight events
     ev = []
     for k, r in scan.items():

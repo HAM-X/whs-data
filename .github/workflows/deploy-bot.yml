@@ -112,6 +112,7 @@ jobs:
             {"command":"scan","description":"Every chart: major swing + live Wyckoff ranges"},
             {"command":"story","description":"Wyckoff Story of a chart — /story 6E 4h"},
             {"command":"brief","description":"The morning brief (rebuilt hourly)"},
+            {"command":"news","description":"High-impact news this week, blackouts, reactions"},
             {"command":"panel","description":"Market Panel: Top 3, strength, sweet spot, themes"},
             {"command":"open","description":"Manage a trade — /open 6E long 1.0909 1.0889 B"},
             {"command":"trades","description":"Open trades, R now, stops"},

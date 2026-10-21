@@ -53,6 +53,7 @@ export function help() {
     "/convert 6J 0.0067100 — futures level → MT5 price",
     "/size 6E 1.0909 1.0889 B 100000 — lots for a trade (risk as A/B/C or %, then balance)",
     "/brief — this morning's brief (rebuilt every hour)",
+    "/news — red-folder releases this week, blackout windows, how price answered the news",
     "/panel — Market Panel: Top 3, strength persistence, sweet spot vs DX, themes, late",
     "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
     "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
@@ -246,7 +247,7 @@ export function panelReport(pn) {
   return o.map(esc).join("\n").replace("&lt;b&gt;Market Panel&lt;/b&gt;", "<b>Market Panel</b>");
 }
 
-export const wantsScan = (text) => /^\/(scan|story|brief|panel)\b|\b(scan|story|wyckoff|range|ranges|brief|morning|panel|themes|sweet)\b/i.test(text || "");
+export const wantsScan = (text) => /^\/(scan|story|brief|panel|news)\b|\b(scan|story|wyckoff|range|ranges|brief|morning|panel|themes|sweet|news|calendar)\b/i.test(text || "");
 
 // ---------- routing ----------
 export function route(text, snap, env = {}, sc = null) {
@@ -266,6 +267,7 @@ export function route(text, snap, env = {}, sc = null) {
     case "/scan": return scanReport(sc);
     case "/panel": return panelReport(sc && sc.__panel);
     case "/brief": return sc && sc.__brief ? sc.__brief : "No brief yet — the robot writes it every hour.";
+    case "/news": return sc && sc.__news ? sc.__news : "No calendar yet — the robot fetches it every hour.";
     case "/story": return need(sym(args[0]), (k) => storyReport(sc, k, args[1] === "1h" ? "1h" : "4h"));
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
     case "/size": return need(sym(args[0]), (k) => size(snap, k, parseFloat(args[1]), parseFloat(args[2]), args[3], parseFloat(args[4]), env));
@@ -281,6 +283,7 @@ export function route(text, snap, env = {}, sc = null) {
   if (/\b(scan|ranges)\b/.test(t) && !k) return scanReport(sc);
   if (/\b(panel|themes|sweet)\b/.test(t)) return panelReport(sc && sc.__panel);
   if (/\b(brief|morning)\b/.test(t)) return sc && sc.__brief ? sc.__brief : "No brief yet.";
+  if (/\b(news|calendar)\b/.test(t)) return sc && sc.__news ? sc.__news : "No calendar yet.";
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (/\b(all|overview|market|everything|dashboard|summary)\b/.test(t) && !k) return all(snap);
   if (k && /\b(effort|volume|vol|supply|demand)\b/.test(t)) return effortReport(snap, k);
@@ -300,12 +303,14 @@ async function loadSnapshot(env) {
 async function loadScan(env) {
   const base = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/";
   const q = "?t=" + Math.floor(Date.now() / 120000);
-  const [a, b, c] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
-                                       fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } }),
-                                       fetch(base + "panel.json" + q, { cf: { cacheTtl: 60 } })]);
+  const [a, b, c, d] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
+                                          fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } }),
+                                          fetch(base + "panel.json" + q, { cf: { cacheTtl: 60 } }),
+                                          fetch(base + "news.json" + q, { cf: { cacheTtl: 60 } })]);
   const sc = a.ok ? await a.json() : {};
   if (b.ok) sc.__brief = (await b.json()).text;
   if (c.ok) sc.__panel = await c.json();
+  if (d.ok) sc.__news = (await d.json()).text;
   return sc;
 }
 

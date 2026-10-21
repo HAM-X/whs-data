@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, brief, desk, health, panel, scan, snapshot, telegram
+from whs import bars, brief, desk, health, news, panel, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -28,7 +28,7 @@ def load_state() -> dict:
         return {"problems": {}, "last_ok_day": None}
 
 
-def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.send) -> dict:
+def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.send, news_fetch=None) -> dict:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now).tz_convert("UTC")
     report, problems = {}, []
     universe = [(k, v, "future") for k, v in FUTURES.items()] + [(k, v, "spot") for k, v in SPOT.items()]
@@ -88,9 +88,46 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
                    problems=problems, symbols=report)
     (DATA / "health.json").write_text(json.dumps(summary, indent=1, default=str))
     write_snapshot(summary, now)
-    write_scan(send)
+    write_news(now, send, news_fetch)
+    write_scan(send, now)
     write_brief(now, send)
     return summary
+
+
+def load_calendar() -> list:
+    try:
+        return json.loads((DATA / "calendar.json").read_text())
+    except Exception:
+        return []
+
+
+def write_news(now, send=telegram.send, fetch=None) -> None:
+    """Stage 6: calendar (merged, 21 days) → data/calendar.json; pre-release alerts; reactions → data/news.json."""
+    try:
+        cal = load_calendar()
+        if fetch is not None:
+            try:
+                cal = news.merge(cal, news.normalise(fetch()), now)
+                (DATA / "calendar.json").write_text(json.dumps(cal, separators=(",", ":")))
+            except Exception as e:      # a calendar outage must never stop the robot; the stored week is used
+                print(f"[calendar error] {type(e).__name__}: {e}")
+        state = load_state()
+        lines, ids = news.pre_alerts(cal, now, state.get("news_alerted", []))
+        if lines and fetch is not None and is_open(now):   # tests (no fetch) never send
+            try:
+                send("\n".join(lines), html=True)
+            except TypeError:
+                send("\n".join(lines))
+        state["news_alerted"] = ids
+        STATE.write_text(json.dumps(state, indent=1))
+        h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
+        reacts = news.reactions(cal, h1, now)                 # last 36 h → the brief
+        week = news.reactions(cal, h1, now, hours=168)        # last 7 days → /news
+        (DATA / "news.json").write_text(json.dumps({"at": str(now), "text": news.report(cal, week, now),
+                                                    "brief": news.brief_lines(cal, reacts, now), "reactions": week},
+                                                   separators=(",", ":"), default=str))
+    except Exception as e:
+        print(f"[news error] {type(e).__name__}: {e}")
 
 
 def write_snapshot(summary: dict, now) -> None:
@@ -106,7 +143,7 @@ def write_snapshot(summary: dict, now) -> None:
         print(f"[snapshot error] {type(e).__name__}: {e}")
 
 
-def write_scan(send=telegram.send) -> None:
+def write_scan(send=telegram.send, now=None) -> None:
     """Stage 3: read every chart (major swings + automatic ranges + Story) → data/scan.json, and alert what changed."""
     try:
         h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
@@ -127,6 +164,13 @@ def write_scan(send=telegram.send) -> None:
         lines, marks = scan.news(res, seen)
         lines += [scan.plan_line(p) for p in plans if p["refused"] or p["rr_low"]]
         plans = [p for p in plans if not (p["refused"] or p["rr_low"])]
+        cal = load_calendar()                    # Stage 6 blackout: no new entries ±60 min of red-folder news
+        at = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+        held = [(p, news.blackout(cal, p["key"], at)) for p in plans]
+        lines += [f"⛔ news blackout · {p['key']} {p['tf']} {p['setup']} held back: "
+                  f"{b[0]['ccy']} {b[0]['title']} at {pd.Timestamp(b[0]['t']).tz_convert('Africa/Nairobi').strftime('%H:%M')}"
+                  for p, b in held if b]
+        plans = [p for p, b in held if not b]
         sp.write_text(json.dumps(marks, indent=1))
         if lines:
             send("🔎 Wyckoff scan\n" + "\n".join(lines[:25]) + ("\n…" if len(lines) > 25 else ""))
@@ -148,7 +192,8 @@ def write_brief(now, send=telegram.send) -> None:
         snap = json.loads((DATA / "snapshot.json").read_text())
         sc = json.loads((DATA / "scan.json").read_text())
         pn = json.loads((DATA / "panel.json").read_text()) if (DATA / "panel.json").exists() else None
-        text = brief.build(snap, sc, now, pn)
+        nw = json.loads((DATA / "news.json").read_text()) if (DATA / "news.json").exists() else {}
+        text = brief.build(snap, sc, now, pn, nw.get("brief"))
         (DATA / "brief.json").write_text(json.dumps({"at": str(now), "text": text}))
         state = load_state()
         local = pd.Timestamp(now).tz_convert(LOCAL_TZ)
@@ -169,4 +214,4 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", action="store_true")
     a = ap.parse_args()
-    run(backfill=a.backfill)
+    run(backfill=a.backfill, news_fetch=news.fetch_week)

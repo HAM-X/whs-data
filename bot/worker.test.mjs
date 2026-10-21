@@ -85,3 +85,11 @@ test("TradingView alerts become Telegram messages with a flag", () => {
   if (!t.includes("<b>Market Panel</b>") || !t.includes("6E/6B") || !t.includes("JPY higher low")) throw new Error("panel " + t);
   console.log("ok panel");
 }
+
+
+test("/news and plain 'any news today' answer from news.json", async () => {
+  const { route } = await import("./worker.js");
+  const sc = { __news: "📰 News · test" };
+  assert.equal(route("/news", {}, {}, sc), "📰 News · test");
+  assert.equal(route("any news today?", {}, {}, sc), "📰 News · test");
+});
