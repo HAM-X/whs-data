@@ -80,6 +80,20 @@ def high(events: list[dict]) -> list[dict]:
     return [e for e in events if e.get("impact") == "High"]
 
 
+def grouped(events: list[dict]) -> list[dict]:
+    """Releases of one currency at the same minute (e.g. CAD CPI m/m + median + trimmed) as ONE event:
+    titles joined with ' · ', ids kept in `ids`; forecast / previous / actual from the first."""
+    by = {}
+    for e in sorted(events, key=lambda x: x["t"]):
+        k = (e["ccy"], e["t"])
+        if k not in by:
+            by[k] = dict(e, ids=[e["id"]])
+        else:
+            by[k]["title"] += " · " + e["title"]
+            by[k]["ids"].append(e["id"])
+    return list(by.values())
+
+
 def keys_for(ccy: str) -> list[str]:
     return CCY_KEYS.get(ccy, [])
 
@@ -111,8 +125,8 @@ def pre_alerts(events: list[dict], now, alerted: list[str]) -> tuple[list[str], 
     """Lines for high-impact releases starting within ALERT_AHEAD_MIN that were not alerted yet."""
     now = pd.Timestamp(now).tz_convert("UTC")
     lines, ids = [], list(alerted or [])
-    soon = [e for e in high(events) if now < pd.Timestamp(e["t"]) <= now + pd.Timedelta(minutes=ALERT_AHEAD_MIN)
-            and e["id"] not in ids]
+    soon = [e for e in grouped(high(events)) if now < pd.Timestamp(e["t"]) <= now + pd.Timedelta(minutes=ALERT_AHEAD_MIN)
+            and not set(e["ids"]) & set(ids)]
     for e in soon:
         t = pd.Timestamp(e["t"])
         mins = int((t - now).total_seconds() // 60)
@@ -121,7 +135,7 @@ def pre_alerts(events: list[dict], now, alerted: list[str]) -> tuple[list[str], 
         lines.append(f"📰 in {mins} min · {_loc(t)} <b>{e['ccy']} {e['title']}</b>{_fx(e)}\n"
                      f"   ⛔ no new entries on {'every chart' if len(ks) >= 8 else ' '.join(ks)} until {until} · "
                      f"funded accounts: don't open or close ±5 min")
-        ids.append(e["id"])
+        ids += e["ids"]
     cutoff = (now - pd.Timedelta(days=KEEP_DAYS)).isoformat()
     ids = [i for i in ids if i.split("|")[-1] >= cutoff]
     return lines, ids
@@ -162,7 +176,7 @@ def reaction(e: dict, d: pd.DataFrame) -> dict | None:
 def reactions(events: list[dict], h1: dict[str, pd.DataFrame], now, hours: float = 36) -> list[dict]:
     now = pd.Timestamp(now).tz_convert("UTC")
     out = []
-    for e in high(events):
+    for e in grouped(high(events)):
         t = pd.Timestamp(e["t"])
         if not (now - pd.Timedelta(hours=hours) <= t <= now - pd.Timedelta(hours=3)):
             continue
@@ -175,7 +189,7 @@ def reactions(events: list[dict], h1: dict[str, pd.DataFrame], now, hours: float
 
 def brief_lines(events: list[dict], reacts: list[dict], now) -> list[str]:
     out = []
-    up = upcoming(events, now, 24)
+    up = grouped(upcoming(events, now, 24))
     if up:
         out.append("<b>News next 24 h</b> (red folder · no new entries ±60 min)")
         for e in up[:10]:
@@ -194,7 +208,7 @@ def report(events: list[dict], reacts: list[dict], now) -> str:
     """Pipdon BOT /news."""
     now = pd.Timestamp(now).tz_convert("UTC")
     out = [f"📰 News · {now.tz_convert(LOCAL).strftime('%a %d %b %H:%M')} UTC+3"]
-    wk = [e for e in high(events) if now - pd.Timedelta(hours=12) <= pd.Timestamp(e["t"]) <= now + pd.Timedelta(days=7)]
+    wk = [e for e in grouped(high(events)) if now - pd.Timedelta(hours=12) <= pd.Timestamp(e["t"]) <= now + pd.Timedelta(days=7)]
     if wk:
         out.append("<b>High impact, this week</b>")
         for e in wk[:25]:

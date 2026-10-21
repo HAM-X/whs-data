@@ -55,3 +55,13 @@ def test_reaction_verdicts():
     vol = np.full(n, 1000.0); vol[b] = 50000.0
     flat = base.copy(); flat[b] = 0.0
     assert news.reaction(e, _bars(flat, vol))["verdict"].startswith("absorbed")
+
+
+def test_same_minute_releases_are_one_line():
+    raw = [{"title": t, "country": "CAD", "date": "2026-10-19T08:30:00-04:00", "impact": "High"} for t in
+           ("CPI m/m", "Median CPI y/y", "Trimmed CPI y/y")]
+    cal = news.normalise(raw)
+    lines, ids = news.pre_alerts(cal, "2026-10-19T11:40Z", [])
+    assert len(lines) == 1 and "CPI m/m · Median CPI y/y · Trimmed CPI y/y" in lines[0] and len(ids) == 3
+    assert news.pre_alerts(cal, "2026-10-19T12:00Z", ids)[0] == []
+    assert sum("CAD" in x for x in news.brief_lines(cal, [], "2026-10-19T06:00Z")) == 1
