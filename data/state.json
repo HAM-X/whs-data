@@ -1,7 +1,5 @@
 {
- "problems": {
-  "GC:gaps": "GC: 1 missing hour(s) in the last day"
- },
- "last_ok_day": "2026-10-20",
+ "problems": {},
+ "last_ok_day": "2026-10-21",
  "last_brief_day": "2026-10-21"
 }
