@@ -249,6 +249,14 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
       st.limits = { day: d, dd: m };
       return `Firm limits set: daily −${d}% · max drawdown −${m}%.`;
     }
+    case "/account": {
+      const sub = String(args[0] || "").toLowerCase();
+      if (["pnl", "dd", "limits"].includes(sub)) {
+        const out = deskRoute("/" + sub, args.slice(1), st, snap, now, panel);
+        return out.startsWith("Usage") || out.startsWith("Firm limits now") ? out : accountText(st, now);
+      }
+      return accountText(st, now);
+    }
     case "/guard": {
       // /guard B  ·  /guard 6E long B  (the second form checks the theme too)
       let key = null, side = 1, g = String(args[0] || "").toUpperCase();
@@ -259,4 +267,22 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
   }
   return null;
 }
-export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard"];
+export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard", "/account", "/plan"];
+
+// /account — one screen: can I trade, today, drawdown, open risk, last trades. Setters: /account pnl -0.4 · dd 3 · limits 5 10
+export function accountText(st, now = Date.now()) {
+  const g = guard(st, 0, now);
+  const lim = st.limits || { day: 5, dd: 10 };
+  const today = localDay(now);
+  const day = st.pnl && st.pnl.day === today ? st.pnl.pct : 0;
+  const icon = g.state === "BLOCKED" ? "⛔" : g.state === "REDUCE" ? "🟠" : "🟢";
+  const last = st.journal.slice(-5).map((j) => fx(j.r, 1) + "R");
+  const sum = st.journal.slice(-5).reduce((a, j) => a + j.r, 0);
+  return [`<b>Account</b>  ▸ ${icon} <b>${g.state === "OK TO EXECUTE" ? "OK TO TRADE" : g.state}</b>` + (g.factor < 1 ? " · half risk" : ""),
+    ...(g.why.length ? g.why.map((w) => "• " + w) : []), "",
+    `<b>Today</b>  ${fx(day)}%  (own stop −${OWN.day}% · firm −${lim.day}%)`,
+    `<b>Account</b>  ${fx(st.dd || 0)}% vs start  (firm −${lim.dd}%)`,
+    `<b>Open risk</b>  ${g.open.toFixed(2)}% · ${st.trades.length} trade${st.trades.length === 1 ? "" : "s"}`,
+    `<b>Last trades</b>  ${last.length ? last.join(" · ") + `  (sum ${fx(sum, 1)}R)` : "none yet"}`,
+    "<i>/account pnl -0.4 · /account dd 3 · /account limits 5 10</i>"].join("\n");
+}

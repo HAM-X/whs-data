@@ -1,4 +1,4 @@
-import { deskRoute, DESK_CMDS, load as loadDesk, save as saveDesk, manage } from "./desk.js";
+import { deskRoute, DESK_CMDS, load as loadDesk, save as saveDesk, manage, guard, RISK } from "./desk.js";
 
 // Pipdon BOT — Telegram command bot on Cloudflare Workers (no AI; every answer is computed).
 // Reads the robot's hourly snapshot (data/snapshot.json in HAM-X/whs-data) and answers only Hamza's chat.
@@ -43,28 +43,20 @@ function footer(snap) {
 // ---------- answers ----------
 export function help() {
   return [
-    "<b>Pipdon BOT</b> — ask in commands or plain words (\"how's gold\", \"euro levels\").",
+    "<b>Pipdon BOT</b>  — every answer ends in a decision",
     "",
-    "/status 6E — price, day change, ranges, ATR, ADR used, last bar effort, MT5 price",
-    "/all — every instrument on one screen",
-    "/levels GC — previous day/week highs and lows, session ranges",
-    "/effort 6J — last 6 bars: effort vs the same hour, spread, close position",
-    "/strength — currency strength ranking (add 1h, 1d or 1w)",
-    "/convert 6J 0.0067100 — futures level → MT5 price",
-    "/size 6E 1.0909 1.0889 B 100000 — lots for a trade (risk as A/B/C or %, then balance)",
-    "/brief — this morning's brief (rebuilt every hour)",
-    "/news — red-folder releases this week, blackout windows, how price answered the news",
-    "/panel — Market Panel: Top 3, strength persistence, sweet spot vs DX, themes, late",
-    "/scan — every chart: major swing and live Wyckoff ranges (read by the robot, no clicks)",
-    "/story 6E 4h — the Wyckoff Story of the latest range on that chart (1h or 4h)",
-    "/health — is the robot's data fresh?",
+    "<b>Read the market</b>",
+    "/today — the board: every chart's action + what to act on, watch and avoid",
+    "/chart 6E [1h] — the chart card: action, trigger, levels, who's in control",
+    "/vsa 6E [1h] — rallies, reactions and bars in VSA notation (V R D S)",
+    "/news — red-folder releases, blackouts, how price answered",
     "",
-    "<b>Trade Desk</b> (any account size — everything in % and R)",
-    "/open 6E long 1.0909 1.0889 B — start managing a trade (future prices, grade or risk %)",
-    "/trades · /close 6E [price] · /stop 6E 1.0921",
-    "/guard [6E long] B — OK / REDUCE / BLOCKED (with themes) · /pnl -0.4 (today %) · /dd 3 (account vs start %) · /limits 5 10",
+    "<b>Trade</b>",
+    "/plan 6E long 1.0909 1.0889 [A|B|C] — GO / REDUCE / NO with the MT5 order and lots",
+    "/open … · /trades · /close 6E [price] — the bot manages the stop hourly",
+    "/account — can I trade, today, drawdown, open risk, last trades",
     "",
-    "Symbols: 6E 6B 6A 6N 6J 6C 6S GC DX (or euro, pound, aussie, kiwi, yen, cad, franc, gold, dollar).",
+    "<i>Plain words work too: \"euro\", \"gold vsa\", \"today\", \"any news\".</i>",
   ].join("\n");
 }
 
@@ -249,6 +241,78 @@ export function panelReport(pn) {
 
 export const wantsScan = (text) => /^\/(scan|story|brief|panel|news)\b|\b(scan|story|wyckoff|range|ranges|brief|morning|panel|themes|sweet|news|calendar)\b/i.test(text || "");
 
+
+// ---------- Robot v2: answers built by the robot (data/decisions.json + card images in KV) ----------
+const tfOf = (a) => (/^1h$/i.test(a || "") ? "1h" : "4h");
+export function todayReply(dec) {
+  if (!dec || !dec._today) return "No board yet — the robot draws it every hour.";
+  return { photo: "board", caption: dec._today };
+}
+export function chartReply(dec, k, tf) {
+  if (k === "DX") return "DX is read as context only — see /today.";
+  const d = dec && dec[`${k} ${tf}`];
+  if (!d) return `No card for ${k} ${tf} yet — the robot draws them every hour.`;
+  return { photo: `card:${k}:${tf}`, caption: d.caption };
+}
+export function vsaReply(dec, k, tf) {
+  const d = dec && dec[`${k} ${tf}`];
+  return d ? d.vsa : `No VSA read for ${k} ${tf} yet.`;
+}
+const CONFLICT = { 1: ["TREND ↓", "SELL ZONE", "SELL RALLIES"], "-1": ["TREND ↑", "BUY ZONE", "BUY PULLBACKS"] };
+// /plan 6E long 1.0909 1.0889 [A|B|C|0.3] [balance] — one answer: GO / REDUCE / NO, the MT5 order and the lots
+export function planText(snap, st, args, env = {}, dec = null, panel = null, now = Date.now()) {
+  const [k, dir, e, s, g0, b0] = args;
+  const i = snap.instruments[k];
+  const side = /^(long|buy|l)$/i.test(dir || "") ? 1 : /^(short|sell|s)$/i.test(dir || "") ? -1 : 0;
+  const entry = parseFloat(e), stop = parseFloat(s);
+  if (!i || !TICK_VALUE[k] || !side || !isFinite(entry) || !isFinite(stop) || (entry - stop) * side <= 0)
+    return "Usage: /plan 6E long 1.0909 1.0889 B — future prices; stop below a long's entry, above a short's. Add the balance at the end if it isn't set.";
+  const grade = String(g0 || "B").toUpperCase();
+  const risk = RISK[grade] ?? parseFloat(grade);
+  const bal = parseFloat(b0) || parseFloat(env.ACCOUNT_BALANCE || "") || 0;
+  const ctx = panel ? { rho: panel.themes?.rho, blocs: panel.themes?.blocs, key: k, side } : {};
+  const gd = st ? guard(st, risk, now, ctx) : { state: "OK TO EXECUTE", why: [], factor: 1 };
+  const acts = ["4h", "1h"].map((tf) => [tf, dec && dec[`${k} ${tf}`] ? dec[`${k} ${tf}`].action : "—"]);
+  const against = acts.filter(([, a]) => CONFLICT[side].includes(a)).map(([tf, a]) => `${tf} says ${a}`);
+  const blackout = acts.some(([, a]) => a === "NO NEW ENTRIES");
+  let verdict = "GO", icon = "🟢";
+  const why = [];
+  if (gd.state === "BLOCKED") { verdict = "NO"; icon = "⛔"; why.push(...gd.why); }
+  else if (blackout) { verdict = "NO"; icon = "⛔"; why.push("news blackout on this currency"); }
+  else {
+    if (gd.state === "REDUCE") { verdict = "REDUCE"; icon = "🟠"; why.push(...gd.why); }
+    if (against.length) { verdict = "REDUCE"; icon = "🟠"; why.push("the chart is against you: " + against.join(", ")); }
+  }
+  const riskNow = risk * (gd.factor || 1) * (verdict === "REDUCE" && against.length ? 0.5 : 1);
+  const R = Math.abs(entry - stop);
+  const ticks = Math.round((R / i.tick) * 1e6) / 1e6;
+  const usd = bal ? (bal * riskNow) / 100 : null;
+  const out = [`<b>PLAN · ${k} ${side === 1 ? "LONG" : "SHORT"}</b>  ▸ ${icon} <b>${verdict}</b>`,
+    `grade ${grade} · risk ${riskNow.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}%` + (usd ? ` = $${Math.round(usd).toLocaleString("en-US")} on ${bal.toLocaleString("en-US")}` : ""),
+    ...why.map((w) => "• " + esc(w)), ""];
+  const m = i.mt5;
+  if (k === "GC") {
+    const cs = parseFloat(env.XAU_CONTRACT || "100");
+    const lots = usd ? Math.floor((usd / (R * cs)) * 100) / 100 : null;
+    out.push(`<b>MT5</b>  XAUUSD ${side === 1 ? "BUY" : "SELL"} · stop $${R.toFixed(2)} away` + (lots != null ? ` → <b>${lots.toFixed(2)} lots</b>` : ""));
+  } else if (m && m.spot != null) {
+    const e5 = toMt5(i, entry), s5 = toMt5(i, stop);
+    const pips = Math.abs(e5 - s5) / m.pip;
+    const pipVal = m.symbol.startsWith("USD") ? (m.symbol === "USDJPY" ? 1000 / m.spot : 10 / m.spot) : 10;
+    const lots = usd ? Math.floor((usd / (pips * pipVal)) * 100) / 100 : null;
+    const inv = m.direction === "inverted";
+    out.push(`<b>MT5</b>  ${m.symbol} ${inv ? (side === 1 ? "SELL" : "BUY") : side === 1 ? "BUY" : "SELL"}  <code>${e5.toFixed(spotDigits(m.symbol))}</code> · stop <code>${s5.toFixed(spotDigits(m.symbol))}</code>` +
+      (lots != null ? ` → <b>${lots.toFixed(2)} lots</b>` : "") + ` (${pips.toFixed(1)} pips)`);
+  }
+  out.push(`<b>Future</b>  ${px(entry, i.tick)} · stop ${px(stop, i.tick)} · ${ticks.toFixed(0)} ticks`);
+  out.push(`<b>Take</b>  ⅓ at 2R ${px(entry + 2 * side * R, i.tick)} · then the Adaptive stop`);
+  out.push(`<b>Charts</b>  ${acts.map(([tf, a]) => `${tf} ${esc(a)}`).join(" · ")}`);
+  out.push(`<b>Guard</b>  ${esc(gd.state === "OK TO EXECUTE" ? "OK" : gd.state)}`);
+  if (verdict !== "NO") out.push(`<i>/open ${k} ${side === 1 ? "long" : "short"} ${entry} ${stop} ${grade}</i>`);
+  if (!bal) out.push("<i>Lots need your balance: add it at the end, e.g. … B 400000</i>");
+  return out.join("\n");
+}
+
 // ---------- routing ----------
 export function route(text, snap, env = {}, sc = null) {
   const raw = (text || "").trim();
@@ -256,40 +320,27 @@ export function route(text, snap, env = {}, sc = null) {
   const cmd = cmd0.toLowerCase().replace(/@.*$/, "");
   const sym = (s) => (s ? findSymbol(s) : null);
   const need = (k, f) => (k ? f(k) : "Which instrument? e.g. 6E, gold, yen.");
+  const dec = sc && sc.__dec;
   switch (cmd) {
     case "/start": case "/help": return help();
-    case "/status": return need(sym(args[0]), (k) => status(snap, k));
-    case "/all": return all(snap);
-    case "/levels": return need(sym(args[0]), (k) => levels(snap, k));
-    case "/effort": return need(sym(args[0]), (k) => effortReport(snap, k));
-    case "/strength": return strengthReport(snap, ["1h", "1d", "1w"].includes(args[0]) ? args[0] : "1d");
+    case "/today": case "/board": case "/brief": case "/panel": case "/scan": case "/all": case "/strength": return todayReply(dec);
+    case "/chart": case "/status": case "/story": case "/levels": return need(sym(args[0]), (k) => chartReply(dec, k, tfOf(args[1])));
+    case "/vsa": case "/effort": return need(sym(args[0]), (k) => vsaReply(dec, k, tfOf(args[1])));
     case "/health": return health(snap);
-    case "/scan": return scanReport(sc);
-    case "/panel": return panelReport(sc && sc.__panel);
-    case "/brief": return sc && sc.__brief ? sc.__brief : "No brief yet — the robot writes it every hour.";
     case "/news": return sc && sc.__news ? sc.__news : "No calendar yet — the robot fetches it every hour.";
-    case "/story": return need(sym(args[0]), (k) => storyReport(sc, k, args[1] === "1h" ? "1h" : "4h"));
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
     case "/size": return need(sym(args[0]), (k) => size(snap, k, parseFloat(args[1]), parseFloat(args[2]), args[3], parseFloat(args[4]), env));
   }
   // plain words
   const t = raw.toLowerCase();
   const k = findSymbol(t);
-  if (/\b(strength|strong|strongest|weak|weakest|rank|ranking)\b/.test(t)) {
-    const win = /\bweek|weekly|1w\b/.test(t) ? "1w" : /\bhour|1h\b/.test(t) ? "1h" : "1d";
-    return strengthReport(snap, win);
-  }
-  if (/\b(story|wyckoff)\b/.test(t) && k) return storyReport(sc, k, /\b1h\b/.test(t) ? "1h" : "4h");
-  if (/\b(scan|ranges)\b/.test(t) && !k) return scanReport(sc);
-  if (/\b(panel|themes|sweet)\b/.test(t)) return panelReport(sc && sc.__panel);
-  if (/\b(brief|morning)\b/.test(t)) return sc && sc.__brief ? sc.__brief : "No brief yet.";
-  if (/\b(news|calendar)\b/.test(t)) return sc && sc.__news ? sc.__news : "No calendar yet.";
+  const tf = /\b1h\b|hour/.test(t) ? "1h" : "4h";
+  if (/\b(news|calendar|cpi|nfp|release)\b/.test(t)) return sc && sc.__news ? sc.__news : "No calendar yet.";
+  if (k && /\b(vsa|effort|volume|supply|demand)\b/.test(t)) return vsaReply(dec, k, tf);
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
-  if (/\b(all|overview|market|everything|dashboard|summary)\b/.test(t) && !k) return all(snap);
-  if (k && /\b(effort|volume|vol|supply|demand)\b/.test(t)) return effortReport(snap, k);
-  if (k && /\b(level|levels|high|highs|low|lows|support|resistance|pdh|pdl)\b/.test(t)) return levels(snap, k);
-  if (k) return status(snap, k);
-  return "I didn't catch an instrument or a question I know.\n\n" + help();
+  if (!k && /\b(today|brief|morning|board|market|overview|all|everything|dashboard|summary|scan|strength|panel)\b/.test(t)) return todayReply(dec);
+  if (k) return chartReply(dec, k, tf);
+  return "I didn't catch an instrument or a question.\n\n" + help();
 }
 
 async function loadSnapshot(env) {
@@ -303,15 +354,34 @@ async function loadSnapshot(env) {
 async function loadScan(env) {
   const base = "https://raw.githubusercontent.com/HAM-X/whs-data/main/data/";
   const q = "?t=" + Math.floor(Date.now() / 120000);
-  const [a, b, c, d] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
+  const [a, b, c, d, e] = await Promise.all([fetch(base + "scan.json" + q, { cf: { cacheTtl: 60 } }),
                                           fetch(base + "brief.json" + q, { cf: { cacheTtl: 60 } }),
                                           fetch(base + "panel.json" + q, { cf: { cacheTtl: 60 } }),
-                                          fetch(base + "news.json" + q, { cf: { cacheTtl: 60 } })]);
+                                          fetch(base + "news.json" + q, { cf: { cacheTtl: 60 } }),
+                                          fetch(base + "decisions.json" + q, { cf: { cacheTtl: 60 } })]);
   const sc = a.ok ? await a.json() : {};
   if (b.ok) sc.__brief = (await b.json()).text;
   if (c.ok) sc.__panel = await c.json();
   if (d.ok) sc.__news = (await d.json()).text;
+  if (e.ok) sc.__dec = await e.json();
   return sc;
+}
+
+async function replyPhoto(env, chatId, name, caption) {
+  const img = env.DESK ? await env.DESK.get("img:" + name, { type: "arrayBuffer" }) : null;
+  if (!img) return reply(env, chatId, caption);
+  const fd = new FormData();
+  fd.append("chat_id", String(chatId));
+  fd.append("caption", caption.slice(0, 1024));
+  fd.append("parse_mode", "HTML");
+  fd.append("photo", new Blob([img], { type: "image/png" }), name.replace(/:/g, "_") + ".png");
+  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendPhoto`, { method: "POST", body: fd });
+  if (!r.ok) await reply(env, chatId, caption);
+}
+
+async function answer(env, chatId, out) {
+  if (out && typeof out === "object" && out.photo) return replyPhoto(env, chatId, out.photo, out.caption);
+  return reply(env, chatId, String(out));
 }
 
 async function reply(env, chatId, text) {
@@ -369,7 +439,10 @@ export default {
         const pr = await fetch("https://raw.githubusercontent.com/HAM-X/whs-data/main/data/panel.json?t=" + Math.floor(Date.now() / 120000),
                                { cf: { cacheTtl: 60 } }).catch(() => null);
         const panel = pr && pr.ok ? await pr.json().catch(() => null) : null;
-        text = deskRoute(dcmd, args, st, snap, Date.now(), panel);
+        if (dcmd === "/plan") {
+          const sc = await loadScan(env).catch(() => null);
+          text = planText(snap, st, args, env, sc && sc.__dec, panel);
+        } else text = deskRoute(dcmd, args, st, snap, Date.now(), panel);
         if (st) await saveDesk(env, st);
       } catch (e) {
         text = `⚠️ Trade Desk error: ${esc(e.message)}`;
@@ -383,7 +456,7 @@ export default {
     } catch (e) {
       text = `⚠️ Could not read the robot's snapshot (${esc(e.message)}). Try again in a minute.`;
     }
-    await reply(env, msg.chat.id, text);
+    await answer(env, msg.chat.id, text);
     return new Response("ok");
   },
 };

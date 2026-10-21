@@ -101,26 +101,16 @@ jobs:
             --data-urlencode 'allowed_updates=["message","edited_message"]' --data-urlencode "drop_pending_updates=true")
           echo "$RESP" | grep -q '"ok":true' || { echo "::error::setWebhook failed: $RESP"; exit 1; }
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/setMyCommands" -H 'content-type: application/json' -d '{"commands":[
-            {"command":"status","description":"Price, ranges, ATR, ADR used, effort, MT5 price — e.g. /status 6E"},
-            {"command":"all","description":"Every instrument on one screen"},
-            {"command":"levels","description":"Day, week and session highs/lows — e.g. /levels gold"},
-            {"command":"effort","description":"Last 6 bars: effort, spread, close — e.g. /effort 6J"},
-            {"command":"strength","description":"Currency strength ranking (1h, 1d, 1w)"},
-            {"command":"convert","description":"Futures level to MT5 price — /convert 6J 0.0067100"},
-            {"command":"size","description":"Lots — /size 6E entry stop A|B|C balance"},
-            {"command":"health","description":"Is the robot data fresh?"},
-            {"command":"scan","description":"Every chart: major swing + live Wyckoff ranges"},
-            {"command":"story","description":"Wyckoff Story of a chart — /story 6E 4h"},
-            {"command":"brief","description":"The morning brief (rebuilt hourly)"},
-            {"command":"news","description":"High-impact news this week, blackouts, reactions"},
-            {"command":"panel","description":"Market Panel: Top 3, strength, sweet spot, themes"},
+            {"command":"today","description":"The board: every chart's action, what to act on"},
+            {"command":"chart","description":"Chart card: action, trigger, levels — /chart 6E 1h"},
+            {"command":"vsa","description":"Rallies, reactions, bars in VSA notation — /vsa 6E"},
+            {"command":"news","description":"Red-folder releases, blackouts, reactions"},
+            {"command":"plan","description":"GO / REDUCE / NO + MT5 lots — /plan 6E long 1.0909 1.0889 B"},
             {"command":"open","description":"Manage a trade — /open 6E long 1.0909 1.0889 B"},
             {"command":"trades","description":"Open trades, R now, stops"},
             {"command":"close","description":"Close a trade — /close 6E [price]"},
-            {"command":"guard","description":"OK / REDUCE / BLOCKED — /guard B"},
-            {"command":"pnl","description":"Today realised % — /pnl -0.4"},
-            {"command":"dd","description":"Account vs start % — /dd 3"},
-            {"command":"help","description":"Everything Pipdon BOT can do"}]}' > /dev/null
+            {"command":"account","description":"Can I trade? Today, drawdown, open risk, last trades"},
+            {"command":"help","description":"What Pipdon BOT does"}]}' > /dev/null
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
             --data-urlencode "text=Pipdon BOT · 💬 I can answer now. Send /help or just ask, e.g. \"how's gold\"." > /dev/null

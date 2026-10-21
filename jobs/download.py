@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from whs import bars, brief, desk, health, news, panel, scan, snapshot, telegram
+from whs import bars, brief, cfkv, desk, health, news, panel, scan, snapshot, telegram
 from whs.config import FUTURES, LOCAL_TZ, SPOT
 from whs.market import is_open
 from whs.sources import yahoo
@@ -28,7 +28,8 @@ def load_state() -> dict:
         return {"problems": {}, "last_ok_day": None}
 
 
-def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.send, news_fetch=None) -> dict:
+def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.send, news_fetch=None,
+        cards_on: bool = False) -> dict:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now).tz_convert("UTC")
     report, problems = {}, []
     universe = [(k, v, "future") for k, v in FUTURES.items()] + [(k, v, "spot") for k, v in SPOT.items()]
@@ -90,8 +91,36 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
     write_snapshot(summary, now)
     write_news(now, send, news_fetch)
     write_scan(send, now)
-    write_brief(now, send)
+    made = write_cards(now, not problems) if cards_on else None
+    write_brief(now, send, made)
     return summary
+
+
+def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=cfkv.put_files):
+    """Robot v2: a decision + VSA + card image per chart, the market board → data/decisions.json + the bot's KV;
+    a 🔔 card when a chart's decision moves to or from an actionable one."""
+    try:
+        from whs import cards         # needs matplotlib; imported here so a run without it still collects data
+        sc = json.loads((DATA / "scan.json").read_text())
+        h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
+        h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
+        dec, imgs = cards.build(now, sc, load_calendar(), h1, h4, health_ok)
+        (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
+        print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded")
+        state = load_state()
+        seen = state.get("decisions")
+        if seen is not None and is_open(now):
+            for k, old, new in cards.changes(dec, seen)[:4]:
+                key, tf = k.split()
+                cap = f"🔔 <b>{k} · {old} → {new}</b>\n" + dec[k]["caption"]
+                if imgs.get(f"card:{key}:{tf}"):
+                    send_photo(imgs[f"card:{key}:{tf}"], cap[:1024])
+        state["decisions"] = {k: d["action"] for k, d in dec.items() if not k.startswith("_")}
+        STATE.write_text(json.dumps(state, indent=1))
+        return dec, imgs
+    except Exception as e:   # cards must never break data collection
+        print(f"[cards error] {type(e).__name__}: {e}")
+        return None
 
 
 def load_calendar() -> list:
@@ -172,8 +201,8 @@ def write_scan(send=telegram.send, now=None) -> None:
                   for p, b in held if b]
         plans = [p for p, b in held if not b]
         sp.write_text(json.dumps(marks, indent=1))
-        if lines:
-            send("🔎 Wyckoff scan\n" + "\n".join(lines[:25]) + ("\n…" if len(lines) > 25 else ""))
+        if lines:   # Robot v2: the hourly event list is no longer sent — decision changes (write_cards) replace it
+            print("[scan] " + " | ".join(lines[:25]))
         for p in plans[:6]:
             inst = (snap.get("instruments") or {}).get(p["key"]) or {}
             m5 = inst.get("mt5") or {}
@@ -186,7 +215,7 @@ def write_scan(send=telegram.send, now=None) -> None:
         print(f"[scan error] {type(e).__name__}: {e}")
 
 
-def write_brief(now, send=telegram.send) -> None:
+def write_brief(now, send=telegram.send, made=None, send_photo=telegram.send_photo) -> None:
     """Morning brief: rebuilt every run into data/brief.json (the bot's /brief); sent once a day from 08:00 UTC+3."""
     try:
         snap = json.loads((DATA / "snapshot.json").read_text())
@@ -199,10 +228,13 @@ def write_brief(now, send=telegram.send) -> None:
         local = pd.Timestamp(now).tz_convert(LOCAL_TZ)
         today = local.strftime("%Y-%m-%d")
         if local.hour >= 8 and state.get("last_brief_day") != today and is_open(now):
-            try:
-                ok = send(text, html=True)
-            except TypeError:            # simple senders (tests) take the text only
-                ok = send(text)
+            if made and made[1].get("board"):            # Robot v2: the board + Today
+                ok = send_photo(made[1]["board"], made[0]["_today"])
+            else:
+                try:
+                    ok = send(text, html=True)
+                except TypeError:            # simple senders (tests) take the text only
+                    ok = send(text)
             if ok is not False:
                 state["last_brief_day"] = today
                 STATE.write_text(json.dumps(state, indent=1))
@@ -214,4 +246,4 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", action="store_true")
     a = ap.parse_args()
-    run(backfill=a.backfill, news_fetch=news.fetch_week)
+    run(backfill=a.backfill, news_fetch=news.fetch_week, cards_on=True)

@@ -74,3 +74,12 @@ test("themes: Roman's heat example — 6E, 6B, 6C at 0.5% → effective 1.29%; t
   assert.equal(g.state, "REDUCE");
   assert.ok(g.why.some((w) => w.includes("same idea")));
 });
+
+
+test("/account: one screen, setters update it", async () => {
+  const { deskRoute } = await import("./desk.js");
+  const st = emptyState();
+  assert.match(deskRoute("/account", [], st, { instruments: {} }, T0), /OK TO TRADE/);
+  const out = deskRoute("/account", ["pnl", "-2.6"], st, { instruments: {} }, T0);
+  assert.match(out, /BLOCKED/); assert.match(out, /−?-?2\.60%/);
+});

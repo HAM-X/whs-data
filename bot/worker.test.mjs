@@ -14,14 +14,43 @@ test("aliases", () => {
   assert.equal(findSymbol("nothing here"), null);
 });
 
-test("every command answers without throwing", () => {
-  for (const q of ["/help", "/status 6E", "/status gold", "/all", "/levels 6B", "/effort 6J", "/effort dx",
-    "/strength", "/strength 1w", "/health", "/convert 6J 0.0067", "/size 6E 1.1200 1.1180 B 100000",
-    "how's the euro", "kiwi levels", "aussie volume", "who is strongest this week", "is the data ok", "market overview",
-    "random words"]) {
-    const out = route(q, snap, {});
-    assert.ok(out.length > 20 && out.length < 4000, q);
+const dec = {
+  _today: "<b>Today · Wed 21 Oct</b>\n<b>Act on</b>  nothing", _at: "x",
+  "6E 4h": { action: "WAIT", caption: "<b>6E · 4h</b>  ▸ <b>WAIT</b>", vsa: "<b>6E · 4h · VSA</b>" },
+  "6E 1h": { action: "BUY ZONE", caption: "<b>6E · 1h</b>  ▸ <b>BUY ZONE</b>", vsa: "<b>6E · 1h · VSA</b>" },
+  "GC 4h": { action: "TREND ↓", caption: "<b>GC · 4h</b>", vsa: "<b>GC · 4h · VSA</b>" },
+  "GC 1h": { action: "TREND ↓", caption: "<b>GC · 1h</b>", vsa: "x" },
+};
+const sc = { __dec: dec, __news: "📰 News · test" };
+
+test("v2 commands: photos for /today and /chart, text for /vsa, old commands map to new ones", () => {
+  assert.deepEqual(route("/today", snap, {}, sc), { photo: "board", caption: dec._today });
+  assert.deepEqual(route("/chart euro", snap, {}, sc), { photo: "card:6E:4h", caption: dec["6E 4h"].caption });
+  assert.equal(route("/chart 6E 1h", snap, {}, sc).photo, "card:6E:1h");
+  assert.equal(route("/vsa 6E", snap, {}, sc), dec["6E 4h"].vsa);
+  assert.equal(route("/status 6E", snap, {}, sc).photo, "card:6E:4h");      // old → /chart
+  assert.equal(route("/effort 6E 1h", snap, {}, sc), dec["6E 1h"].vsa);     // old → /vsa
+  assert.equal(route("/brief", snap, {}, sc).photo, "board");               // old → /today
+  assert.equal(route("how's gold", snap, {}, sc).photo, "card:GC:4h");
+  assert.equal(route("gold vsa 1h", snap, {}, sc), "x");
+  assert.equal(route("today", snap, {}, sc).photo, "board");
+  for (const q of ["/help", "/health", "/convert 6J 0.0067", "/size 6E 1.1200 1.1180 B 100000", "random words", "/chart dx"]) {
+    const out = route(q, snap, {}, sc);
+    assert.ok(typeof out === "string" && out.length > 20 && out.length < 4000, q);
   }
+  assert.match(route("/today", snap, {}, null), /No board yet/);
+});
+
+test("/plan: GO with MT5 lots; REDUCE when the chart is against; NO in a blackout", async () => {
+  const { planText } = await import("./worker.js");
+  const st = { trades: [], journal: [], pnl: null, dd: 0, limits: { day: 5, dd: 10 } };
+  const go = strip(planText(snap, st, ["6E", "long", "1.1200", "1.1180", "B", "400000"], {}, dec));
+  assert.match(go, /GO/); assert.match(go, /lots/); assert.match(go, /1h BUY ZONE/);
+  const red = strip(planText(snap, st, ["GC", "long", String(snap.instruments.GC.price), String(snap.instruments.GC.price - 10), "B", "400000"], {}, dec));
+  assert.match(red, /REDUCE/); assert.match(red, /against you/);
+  const d2 = { ...dec, "6E 4h": { action: "NO NEW ENTRIES" } };
+  assert.match(strip(planText(snap, st, ["6E", "long", "1.1200", "1.1180", "B"], {}, d2)), /NO/);
+  assert.match(planText(snap, st, ["6E", "long", "1.1180", "1.1200"], {}, dec), /Usage/);
 });
 
 // Stack v2 worked examples (risk $500 = 0.25% of 200,000)
@@ -72,8 +101,6 @@ test("TradingView alerts become Telegram messages with a flag", () => {
   if (!a.includes("sideways") || !a.includes("phase B")) throw new Error("scan report");
   const b = storyReport(sc, "6E", "4h");
   if (!b.includes("#1 A") || !b.includes("BIAS")) throw new Error("story report");
-  if (!route("/story euro", {}, {}, sc).includes("SC on 6.1")) throw new Error("story route");
-  if (!route("show me the wyckoff story for euro", {}, {}, sc).includes("BIAS")) throw new Error("story words");
   console.log("ok scan commands");
 }
 
@@ -88,8 +115,6 @@ test("TradingView alerts become Telegram messages with a flag", () => {
 
 
 test("/news and plain 'any news today' answer from news.json", async () => {
-  const { route } = await import("./worker.js");
-  const sc = { __news: "📰 News · test" };
   assert.equal(route("/news", {}, {}, sc), "📰 News · test");
   assert.equal(route("any news today?", {}, {}, sc), "📰 News · test");
 });
