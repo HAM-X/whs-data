@@ -34,4 +34,14 @@ jobs:
           print(); print(news.report(ev, [], now))
           lines, _ = news.pre_alerts(ev, now, [])
           print(); print("pre-alerts now:", lines)
+          # annotations (readable through the REST API): summary, then the high-impact list in chunks
+          def note(title, text):
+              print(f"::notice title={title}::" + text.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
+          note("feed", f"raw {len(raw)} · kept {len(ev)} · high {len(hi)} · with actual {sum(1 for e in ev if e.get('actual'))}\n"
+                       f"keys {sorted({k for x in raw for k in x})}\nimpacts {sorted({str(x.get('impact')) for x in raw})}\n"
+                       f"first {json.dumps(raw[0]) if raw else None}")
+          rows = [f"{pd.Timestamp(e['t']).tz_convert('Africa/Nairobi').strftime('%a %d %H:%M')} {e['ccy']} {e['title']} | fc {e['forecast']} | prev {e['previous']} | act {e['actual']}" for e in hi]
+          for i in range(0, len(rows), 15):
+              note(f"high {i // 15 + 1}", "\n".join(rows[i:i + 15]))
+          note("pre-alerts", "\n".join(lines) or "none in the next 75 min")
           PY
