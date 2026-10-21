@@ -29,7 +29,7 @@ def load_state() -> dict:
 
 
 def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.send, news_fetch=None,
-        cards_on: bool = False) -> dict:
+        cards_on: bool = False, ltf_fetch=None) -> dict:
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now).tz_convert("UTC")
     report, problems = {}, []
     universe = [(k, v, "future") for k, v in FUTURES.items()] + [(k, v, "spot") for k, v in SPOT.items()]
@@ -89,6 +89,8 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
                    problems=problems, symbols=report)
     (DATA / "health.json").write_text(json.dumps(summary, indent=1, default=str))
     write_snapshot(summary, now)
+    if ltf_fetch is not None:
+        write_ltf_bars(now, ltf_fetch)
     write_news(now, send, news_fetch)
     write_scan(send, now)
     made = write_cards(now, not problems) if cards_on else None
@@ -96,31 +98,63 @@ def run(backfill: bool = False, now=None, fetch=yahoo.fetch_1h, send=telegram.se
     return summary
 
 
-def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=cfkv.put_files):
+def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=cfkv.put_bundle, alerts: bool = True):
     """Robot v2: a decision + VSA + card image per chart, the market board → data/decisions.json + the bot's KV;
     a 🔔 card when a chart's decision moves to or from an actionable one."""
     try:
+        import warnings
+        warnings.filterwarnings("ignore", category=RuntimeWarning)   # empty-slice warnings on short intraday windows
         from whs import cards         # needs matplotlib; imported here so a run without it still collects data
         sc = json.loads((DATA / "scan.json").read_text())
         h1 = {k: bars.read(DATA / "bars" / "1h" / f"{k}.csv") for k in FUTURES}
         h4 = {k: bars.read(DATA / "bars" / "4h" / f"{k}.csv") for k in FUTURES}
-        dec, imgs = cards.build(now, sc, load_calendar(), h1, h4, health_ok)
+        ltf = {tf: {k: bars.read(DATA / "bars" / tf / f"{k}.csv") for k in FUTURES} for tf in LTF}
+        snap = json.loads((DATA / "snapshot.json").read_text()) if (DATA / "snapshot.json").exists() else {}
+        dec, imgs = cards.build(now, sc, load_calendar(), h1, h4, health_ok, ltf=ltf, snap=snap)
         (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
         print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded")
+        if kv is cfkv.put_bundle:
+            cfkv.put_json("dec:latest", dec)          # the bot reads the newest decisions from KV (2 writes an hour)
         state = load_state()
         seen = state.get("decisions")
-        if seen is not None and is_open(now):
+        if alerts and seen is not None and is_open(now):
             for k, old, new in cards.changes(dec, seen)[:4]:
                 key, tf = k.split()
                 cap = f"🔔 <b>{k} · {old} → {new}</b>\n" + dec[k]["caption"]
                 if imgs.get(f"card:{key}:{tf}"):
                     send_photo(imgs[f"card:{key}:{tf}"], cap[:1024])
-        state["decisions"] = {k: d["action"] for k, d in dec.items() if not k.startswith("_")}
-        STATE.write_text(json.dumps(state, indent=1))
+        if alerts:
+            state["decisions"] = {k: d["action"] if not k.endswith("m") or not d.get("strong") else d["action"] + " ✅"
+                                  for k, d in dec.items() if not k.startswith("_")}
+            STATE.write_text(json.dumps(state, indent=1))
         return dec, imgs
     except Exception as e:   # cards must never break data collection
         print(f"[cards error] {type(e).__name__}: {e}")
         return None
+
+
+LTF = {"15m": (pd.Timedelta(minutes=15), 60), "5m": (pd.Timedelta(minutes=5), 25)}   # step, days kept
+
+
+def write_ltf_bars(now, fetch=yahoo.fetch) -> None:
+    """15m and 5m bars of the futures (Yahoo keeps 60 days) → data/bars/15m, data/bars/5m. Never stops the robot."""
+    for tf, (step, keep) in LTF.items():
+        for key, meta in FUTURES.items():
+            if meta.get("context"):
+                continue
+            try:
+                path = DATA / "bars" / tf / f"{key}.csv"
+                old = bars.read(path)
+                raw, err = fetch(meta["yahoo"], "60d" if old.empty else "5d", tf)
+                if err:
+                    print(f"[ltf] {key} {tf}: {err}")
+                    continue
+                new = bars.clean_future(bars.normalise(raw, now=now, step=step))
+                merged, _, _ = bars.merge(old, new)
+                merged = merged[merged["time"] >= pd.Timestamp(now).tz_convert("UTC") - pd.Timedelta(days=keep)]
+                bars.write(merged.reset_index(drop=True), path)
+            except Exception as e:
+                print(f"[ltf error] {key} {tf}: {type(e).__name__}: {e}")
 
 
 def load_calendar() -> list:
@@ -246,4 +280,4 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", action="store_true")
     a = ap.parse_args()
-    run(backfill=a.backfill, news_fetch=news.fetch_week, cards_on=True)
+    run(backfill=a.backfill, news_fetch=news.fetch_week, cards_on=True, ltf_fetch=yahoo.fetch)

@@ -249,6 +249,7 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
       st.limits = { day: d, dd: m };
       return `Firm limits set: daily −${d}% · max drawdown −${m}%.`;
     }
+    case "/journal": return journalText(st);
     case "/account": {
       const sub = String(args[0] || "").toLowerCase();
       if (["pnl", "dd", "limits"].includes(sub)) {
@@ -267,7 +268,19 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
   }
   return null;
 }
-export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard", "/account", "/plan"];
+export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard", "/account", "/plan", "/journal"];
+
+// /journal — what your closed trades say: last 10, win rate, average R, total, best and worst
+export function journalText(st) {
+  const j = st.journal || [];
+  if (!j.length) return "<b>Journal</b>  no closed trades yet — /close logs them (the bot logs stops it manages).";
+  const n = j.length, wins = j.filter((x) => x.r > 0).length;
+  const sum = j.reduce((a, x) => a + x.r, 0), pct = j.reduce((a, x) => a + x.r * (x.risk || 0), 0);
+  const best = Math.max(...j.map((x) => x.r)), worst = Math.min(...j.map((x) => x.r));
+  const rows = j.slice(-10).reverse().map((x) => `${(x.day || "").slice(5)}  ${x.key.padEnd(3)} ${x.side === 1 ? "long " : "short"} ${fx(x.r, 2).padStart(6)}R  ${fx(x.r * (x.risk || 0), 2).padStart(6)}%`);
+  return [`<b>Journal</b>  ${n} trades · win ${Math.round((100 * wins) / n)}% · avg ${fx(sum / n, 2)}R · total ${fx(sum, 2)}R (${fx(pct, 2)}%)`,
+    `best ${fx(best, 2)}R · worst ${fx(worst, 2)}R`, "", "<b>Last 10</b>", "<pre>" + rows.join("\n") + "</pre>"].join("\n");
+}
 
 // /account — one screen: can I trade, today, drawdown, open risk, last trades. Setters: /account pnl -0.4 · dd 3 · limits 5 10
 export function accountText(st, now = Date.now()) {

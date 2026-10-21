@@ -25,6 +25,7 @@ jobs:
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       ACCOUNT_BALANCE: ${{ secrets.ACCOUNT_BALANCE }}
+      GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -81,6 +82,7 @@ jobs:
           printf '%s' "$WEBHOOK_SECRET"   | npx --yes wrangler@4 secret put WEBHOOK_SECRET
           TV_KEY=$(printf 'tv:%s' "$TELEGRAM_TOKEN" | sha256sum | cut -c1-32)
           printf '%s' "$TV_KEY"           | npx --yes wrangler@4 secret put TV_KEY
+          if [ -n "$GH_DISPATCH_TOKEN" ]; then printf '%s' "$GH_DISPATCH_TOKEN" | npx --yes wrangler@4 secret put GH_TOKEN; fi
           if [ -n "$ACCOUNT_BALANCE" ]; then
             printf '%s' "$ACCOUNT_BALANCE" | npx --yes wrangler@4 secret put ACCOUNT_BALANCE
           fi
@@ -102,14 +104,20 @@ jobs:
           echo "$RESP" | grep -q '"ok":true' || { echo "::error::setWebhook failed: $RESP"; exit 1; }
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/setMyCommands" -H 'content-type: application/json' -d '{"commands":[
             {"command":"today","description":"The board: every chart action and what to act on"},
+            {"command":"refresh","description":"Fresh read of every chart now (about 2 min)"},
+            {"command":"setups","description":"Act now + charts at a 4h or 1h edge"},
             {"command":"chart","description":"Chart card: action, trigger, levels — /chart 6E 1h"},
-            {"command":"vsa","description":"Rallies, reactions, bars in VSA notation — /vsa 6E"},
+            {"command":"zoom","description":"15m or 5m read against the 4h and 1h edges — /zoom 6E 5m"},
+            {"command":"vsa","description":"Rallies, reactions, bars in VSA notation — /vsa 6E 15m"},
+            {"command":"why","description":"The Wyckoff story: events, phases, bias — /why 6E"},
+            {"command":"dollar","description":"USD strong, weak or mixed and what it favours"},
             {"command":"news","description":"Red-folder releases, blackouts, reactions"},
-            {"command":"plan","description":"GO / REDUCE / NO + MT5 lots — /plan 6E long 1.0909 1.0889 B"},
+            {"command":"plan","description":"GO, REDUCE or NO + MT5 lots — /plan 6E long 1.0909 1.0889 B"},
             {"command":"open","description":"Manage a trade — /open 6E long 1.0909 1.0889 B"},
             {"command":"trades","description":"Open trades, R now, stops"},
             {"command":"close","description":"Close a trade — /close 6E [price]"},
-            {"command":"account","description":"Can I trade? Today, drawdown, open risk, last trades"},
+            {"command":"account","description":"Can I trade? Today, drawdown, open risk"},
+            {"command":"journal","description":"Closed trades: win rate, average R, last 10"},
             {"command":"help","description":"What Pipdon BOT does"}]}' > /dev/null
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \

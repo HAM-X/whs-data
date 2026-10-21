@@ -19,7 +19,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-from . import core, decide, news, render, swings, vsa
+from . import core, decide, news, render, scan as scanmod, swings, vsa
 from .config import FUTURES
 
 LOCAL = "Africa/Nairobi"
@@ -66,7 +66,57 @@ def caption(key: str, tf: str, dec: dict, g: dict | None, control: str, news_lin
     return "\n".join(lines)[:1024]
 
 
-def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True, outdir: str | None = None) -> tuple[dict, dict]:
+LTF_TAIL = {"15m": 2000, "5m": 3000}         # bars read on the lower timeframes (≈ 3 weeks of 15m, ≈ 10 days of 5m)
+BULL = {"BUY ZONE", "BUY PULLBACKS"}
+BEAR = {"SELL ZONE", "SELL RALLIES"}
+
+
+def nested(price: float, d4: dict | None, d1: dict | None) -> dict:
+    """Where price sits in the 4h / 1h ranges: side +1 at or just below a support (spring territory), −1 at or just
+    above a resistance, 0 inside. A 15m / 5m setup only matters at those edges."""
+    for tf, d in (("4h", d4), ("1h", d1)):
+        if not d or not d.get("levels"):
+            continue
+        S, R = d["levels"]
+        H = R - S
+        if H <= 0:
+            continue
+        pos = (price - S) / H
+        if -0.5 <= pos <= 0.25:
+            where = "below" if pos < 0 else "at"
+            return dict(side=1, tf=tf, level=S, line=f"price {where} the {tf} support {_p(S)} ({pos:+.2f} of the {tf} range)")
+        if 0.75 <= pos <= 1.5:
+            where = "above" if pos > 1 else "at"
+            return dict(side=-1, tf=tf, level=R, line=f"price {where} the {tf} resistance {_p(R)} ({pos:+.2f} of the {tf} range)")
+        if 0 < pos < 1:
+            return dict(side=0, tf=tf, level=None, line=f"price inside the {tf} range {_p(S)}–{_p(R)}, away from its edges")
+    acts = " · ".join(f"{tf} {d['action']}" for tf, d in (("4h", d4), ("1h", d1)) if d)
+    return dict(side=0, tf=None, level=None, line=f"no 4h / 1h range at price ({acts})")
+
+
+def why_text(key: str, tf: str, rec: dict, dec: dict) -> str:
+    g = (rec.get("ranges") or [None])[-1]
+    out = [f"<b>{key} · {tf} · the Wyckoff story</b>  ▸ <b>{_esc(dec['action'])}</b>", ""]
+    if not g:
+        m = rec.get("major") or {}
+        out.append(_esc({1: "Major trend up", -1: "Major trend down"}.get(m.get("state"), "Sideways") +
+                        (f" since {_loc(m['since'], '%d %b %H:%M')}" if m.get("since") else "") +
+                        (f" · holds while price stays {'above' if m.get('state') == 1 else 'below'} {_p(m.get('protected'))}"
+                         if m.get("protected") is not None and m.get("state") else "")))
+        out.append("No live range: the robot reads a range once a climax stops the trend and the AR confirms it.")
+        return "\n".join(out)
+    out.append(f"<b>{_esc(g['name'])}</b> · phase {g['phase']} · {_p(g['support'])} – {_p(g['resistance'])}")
+    ev = [f"{'✓' if st == 'confirmed' else '·'} {_loc(iso, '%d %b %H:%M')}  {name:<8} {_p(pr)}" for iso, name, st, pr in g["events"]]
+    if ev:
+        out.append("<pre>" + _esc("\n".join(ev[-10:])) + "</pre>")
+    out += [_esc(x) for x in g.get("story") or []]
+    out.append(f"<b>Bias</b>  {_esc(g.get('bias', ''))}")
+    out.append("<i>✓ confirmed · candidate</i>")
+    return "\n".join(out)
+
+
+def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True, outdir: str | None = None,
+          ltf: dict | None = None, snap: dict | None = None) -> tuple[dict, dict]:
     now = pd.Timestamp(now).tz_convert("UTC")
     outdir = outdir or tempfile.mkdtemp(prefix="whs_cards_")
     dec_all, images, board_rows = {}, {}, []
@@ -102,13 +152,59 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
             except Exception as e:
                 print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
             dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
-                                          caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs))
+                                          caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs),
+                                          why=why_text(key, tf, rec, dec), price=float(c[-1]))
             row["d4" if tf == "4h" else "d1"] = dec
             if tf == "4h":
                 row["ctrl"] = vs["verdict"]
                 row["ctrl_why"] = f"rally {lr['code'] if lr else '?'} · reaction {lx['code'] if lx else '?'}"
         if "d4" in row and "d1" in row:
             board_rows.append(row)
+        # ---- 15m / 5m: their own structure, read against the 4h / 1h range edges ----
+        for tf in ("15m", "5m"):
+            try:
+                d = (ltf or {}).get(tf, {}).get(key)
+                if d is None or len(d) < 300:
+                    continue
+                d = d.tail(LTF_TAIL[tf]).reset_index(drop=True)
+                rec = scanmod.read_one(d, tf, h1.get(key))
+                t = pd.to_datetime(d["time"], utc=True)
+                o, h, l, c, v = (d[x].to_numpy(float) for x in ("open", "high", "low", "close", "volume"))
+                eff = core.effort(v, t, scanmod.TF_MIN[tf])
+                led = swings.ledger(o, h, l, c, eff)
+                vs = vsa.read(o, h, l, c, eff, led, n_swings=4, n_bars=5)
+                dec = decide.chart(rec, news.blackout(cal, key, now), _loc)
+                g = (rec.get("ranges") or [None])[-1]
+                ns = nested(float(c[-1]), dec_all.get(f"{key} 4h"), dec_all.get(f"{key} 1h"))
+                act = dec["action"]
+                aligned = (ns["side"] == 1 and (act in BULL or (act in ("WATCH", "WAIT") and vs["verdict"].startswith("DEMAND")))) or \
+                          (ns["side"] == -1 and (act in BEAR or (act in ("WATCH", "WAIT") and vs["verdict"].startswith("SUPPLY"))))
+                strong = aligned and act in BULL | BEAR
+                tag = (" ✅ entry at the " + ns["tf"] + " edge" if strong else " ◐ supportive at the " + ns["tf"] + " edge" if aligned else "")
+                lr = next((x for x in reversed(vs["swings"]) if x["dir"] == 1), None)
+                lx = next((x for x in reversed(vs["swings"]) if x["dir"] == -1), None)
+                ctl = vs["verdict"].split(" ")[0] + "".join(f" · {nm} {x['code']} {x['text']}" for nm, x in (("rally", lr), ("reaction", lx)) if x)
+                cap = (f"<b>{key} · {tf}</b>  ▸ <b>{_esc(act)}</b>{_esc(tag)}\n<b>HTF</b>  {_esc(ns['line'])}\n" +
+                       caption(key, tf, dec, g, ctl, news_line).split("\n", 1)[1])[:1024]
+                png = os.path.join(outdir, f"card_{key}_{tf}.png")
+                hl = []
+                for tf2, dd in (("4h", dec_all.get(f"{key} 4h")), ("1h", dec_all.get(f"{key} 1h"))):
+                    for nm, lv in zip(("support", "resistance"), (dd or {}).get("levels") or []):
+                        same = next((x for x in hl if abs(x[1] - lv) <= 1e-9 + abs(lv) * 1e-5), None)
+                        if same:                     # the same edge on 4h and 1h → one label
+                            hl[hl.index(same)] = (same[0].replace(f" {nm}", f" · {tf2} {nm}"), lv)
+                        else:
+                            hl.append((f"{tf2} {nm}", lv))
+                try:
+                    render.chart_card(key, tf, d, eff, rec, dict(dec, action=act, htf=ns["line"] + tag), vs, news_line, png, htf_lines=hl)
+                    images[f"card:{key}:{tf}"] = png
+                except Exception as e:
+                    print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
+                dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
+                                              caption=cap, vsa=vsa_text(key, tf, t, vs), why=why_text(key, tf, rec, dec),
+                                              nest=ns, aligned=bool(aligned), strong=bool(strong), price=float(c[-1]))
+            except Exception as e:
+                print(f"[ltf read error] {key} {tf}: {type(e).__name__}: {e}")
     png = os.path.join(outdir, "board.png")
     try:
         render.board(board_rows, now.tz_convert(LOCAL).strftime("%a %d %b %H:%M") + " UTC+3", png)
@@ -116,6 +212,12 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
     except Exception as e:
         print(f"[board error] {type(e).__name__}: {e}")
     dec_all["_today"] = today_text(dec_all, up24, now, health_ok)
+    dec_all["_setups"] = setups_text(dec_all, now)
+    try:
+        dec_all["_dollar"] = dollar_text(scan, h1, h4, snap, cal, now)
+    except Exception as e:
+        print(f"[dollar error] {type(e).__name__}: {e}")
+        dec_all["_dollar"] = "No dollar read this hour."
     dec_all["_at"] = now.isoformat()
     return dec_all, images
 
@@ -147,13 +249,85 @@ def today_text(dec: dict, up24: list, now, health_ok: bool) -> str:
     return "\n".join(out)[:1024]
 
 
+def setups_text(dec: dict, now) -> str:
+    items = [(k, d) for k, d in dec.items() if not k.startswith("_")]
+    act = [(k, d) for k, d in items if d["action"] in BULL | BEAR and (not k.endswith("m") or d.get("aligned"))]
+    edge = [(k, d) for k, d in items if k.endswith("m") and d.get("nest", {}).get("side") and not (d["action"] in BULL | BEAR and d.get("aligned"))]
+    watch = [(k, d) for k, d in items if d["action"] == "WATCH" and not k.endswith("m")]
+    out = [f"<b>Setups · {now.tz_convert(LOCAL).strftime('%a %H:%M')}</b>", ""]
+    out.append("<b>Act now</b>" if act else "<b>Act now</b>  nothing confirmed")
+    out += [f"• <b>{k}</b> {_esc(d['action'])} — {_esc(d['short'])}" + (" ✅ at the HTF edge" if d.get("strong") else "") for k, d in act[:6]]
+    if edge:
+        out.append("<b>At a 4h / 1h edge</b>  (where a 15m / 5m entry comes from)")
+        seen = set()
+        for k, d in edge:
+            key = k.split()[0]
+            if (key, d["nest"]["tf"]) in seen:
+                continue
+            seen.add((key, d["nest"]["tf"]))
+            ltfs = " · ".join(f"{tf} {dec[f'{key} {tf}']['action']}{' ◐' if dec[f'{key} {tf}'].get('aligned') else ''}"
+                              for tf in ("15m", "5m") if f"{key} {tf}" in dec)
+            out.append(f"• {key} — {_esc(d['nest']['line'])} → {_esc(ltfs)}")
+    if watch:
+        out.append("<b>Watch</b>  (phase C forming)")
+        out += [f"• {k} — {_esc(d['short'])}" for k, d in watch[:4]]
+    out.append("<i>/zoom 6E for the 15m · /zoom 6E 5m · ◐ = the lower timeframe leans the edge's way</i>")
+    return "\n".join(out)
+
+
+CCY_KEY = {"EUR": "6E", "GBP": "6B", "AUD": "6A", "NZD": "6N", "JPY": "6J", "CAD": "6C", "CHF": "6S"}
+
+
+def dollar_text(scan: dict, h1: dict, h4: dict, snap: dict | None, cal: list, now) -> str:
+    acts, verd = {}, {}
+    for tf, src, mins in (("4h", h4, 240), ("1h", h1, 60)):
+        d = src.get("DX")
+        if d is None or len(d) < 100:
+            continue
+        d = d.reset_index(drop=True)
+        rec = scanmod.read_one(d, tf, h4.get("DX") if tf == "1h" else None)
+        acts[tf] = decide.chart(rec, None, _loc)["action"]
+        t = pd.to_datetime(d["time"], utc=True)
+        o, h, l, c, v = (d[x].to_numpy(float) for x in ("open", "high", "low", "close", "volume"))
+        eff = core.effort(v, t, mins)
+        verd[tf] = vsa.read(o, h, l, c, eff, swings.ledger(o, h, l, c, eff))["verdict"].split(" ")[0]
+    up = {"TREND ↑", "BUY ZONE", "BUY PULLBACKS"}
+    dn = {"TREND ↓", "SELL ZONE", "SELL RALLIES"}
+    sc = sum(w * (1 if acts.get(tf) in up else -1 if acts.get(tf) in dn else 0) for tf, w in (("4h", 2), ("1h", 1)))
+    sc += sum(0.5 * (1 if verd.get(tf) == "DEMAND" else -1 if verd.get(tf) == "SUPPLY" else 0) for tf in ("4h", "1h"))
+    state = "USD STRONG" if sc >= 1.5 else "USD WEAK" if sc <= -1.5 else "USD MIXED"
+    st = ((snap or {}).get("strength") or {}).get("1d") or []
+    order = [x["ccy"] for x in st]
+    out = [f"<b>Dollar</b>  ▸ <b>{state}</b>",
+           f"DX 4h {_esc(acts.get('4h', '—'))} · 1h {_esc(acts.get('1h', '—'))} · control 4h {verd.get('4h', '—')} · 1h {verd.get('1h', '—')}"]
+    if order:
+        out.append("<b>Strength (1 day)</b>  " + " &gt; ".join(order))
+        fx = [c for c in order if c in CCY_KEY]
+        if state == "USD STRONG" and fx:
+            out.append(f"<b>Favour</b>  shorts on the weakest: {', '.join(CCY_KEY[c] for c in fx[-2:])} · longs against the dollar need grade A")
+        elif state == "USD WEAK" and fx:
+            out.append(f"<b>Favour</b>  longs on the strongest: {', '.join(CCY_KEY[c] for c in fx[:2])} · gold leans up with a weak dollar")
+        else:
+            out.append("<b>Favour</b>  no dollar tailwind — trade each chart on its own structure")
+    usd = [e for e in news.grouped(news.upcoming(cal, now, 24)) if e["ccy"] == "USD"]
+    out.append("<b>US news</b>  " + (" · ".join(f"{_esc(e['title'][:30])} {_loc(e['t'], '%H:%M')}" for e in usd[:3]) if usd else "none in 24 h"))
+    out.append("<i>Strength is context only — Edge Lab found no edge in it on its own.</i>")
+    return "\n".join(out)
+
+
 def changes(dec: dict, seen: dict) -> list[tuple[str, str, str]]:
-    """(chart, old action, new action) where the move is to or from an actionable decision."""
+    """(chart, old action, new action) where the move is to or from an actionable decision.
+    15m / 5m charts alert only when the new decision is an entry AT a 4h / 1h edge (aligned)."""
     out = []
     for k, d in dec.items():
         if k.startswith("_"):
             continue
         old = seen.get(k)
+        if k.endswith("m"):                      # 15m / 5m: only a NEW entry at a 4h / 1h edge alerts
+            cur = d["action"] + " ✅" if d.get("strong") else d["action"]
+            if d.get("strong") and old is not None and old != cur:
+                out.append((k, old.replace(" ✅", ""), d["action"] + " at the " + d["nest"]["tf"] + " edge"))
+            continue
         if old is not None and old != d["action"] and (d["action"] in ACTIONABLE or old in ACTIONABLE):
             out.append((k, old, d["action"]))
     return out

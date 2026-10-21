@@ -47,16 +47,22 @@ export function help() {
     "",
     "<b>Read the market</b>",
     "/today — the board: every chart's action + what to act on, watch and avoid",
+    "/refresh — a fresh read of every chart now (≈2 min) · /refresh 6E 15m for one chart",
+    "/setups — what to act on now, and which charts sit at a 4h / 1h edge",
     "/chart 6E [1h] — the chart card: action, trigger, levels, who's in control",
-    "/vsa 6E [1h] — rallies, reactions and bars in VSA notation (V R D S)",
+    "/zoom 6E [5m] — the 15m / 5m structure read against the 4h / 1h range edges",
+    "/vsa 6E [1h|15m|5m] — rallies, reactions and bars in VSA notation (V R D S)",
+    "/why 6E [1h] — the Wyckoff story: events, phases, bias",
+    "/dollar — USD strong / weak / mixed and what it favours",
     "/news — red-folder releases, blackouts, how price answered",
     "",
     "<b>Trade</b>",
     "/plan 6E long 1.0909 1.0889 [A|B|C] — GO / REDUCE / NO with the MT5 order and lots",
     "/open … · /trades · /close 6E [price] — the bot manages the stop hourly",
     "/account — can I trade, today, drawdown, open risk, last trades",
+    "/journal — your closed trades: win rate, average R, last 10",
     "",
-    "<i>Plain words work too: \"euro\", \"gold vsa\", \"today\", \"any news\".</i>",
+    "<i>Plain words work too: \"euro\", \"gold vsa 15m\", \"why yen\", \"setups\", \"dollar\", \"any news\".</i>",
   ].join("\n");
 }
 
@@ -243,7 +249,7 @@ export const wantsScan = (text) => /^\/(scan|story|brief|panel|news)\b|\b(scan|s
 
 
 // ---------- Robot v2: answers built by the robot (data/decisions.json + card images in KV) ----------
-const tfOf = (a) => (/^1h$/i.test(a || "") ? "1h" : "4h");
+const tfOf = (a, dflt = "4h") => { const m = String(a || "").toLowerCase().match(/^(4h|1h|15m|5m)$/); return m ? m[1] : dflt; };
 export function todayReply(dec) {
   if (!dec || !dec._today) return "No board yet — the robot draws it every hour.";
   return { photo: "board", caption: dec._today };
@@ -254,6 +260,17 @@ export function chartReply(dec, k, tf) {
   if (!d) return `No card for ${k} ${tf} yet — the robot draws them every hour.`;
   return { photo: `card:${k}:${tf}`, caption: d.caption };
 }
+export function zoomReply(dec, k, tf) {
+  if (k === "DX") return "DX is read as context only — see /dollar.";
+  const d = dec && dec[`${k} ${tf}`];
+  if (!d) return `No ${tf} read for ${k} yet — the robot reads 15m and 5m every hour.`;
+  return { photo: `card:${k}:${tf}`, caption: d.caption };
+}
+export function whyReply(dec, k, tf) {
+  const d = dec && dec[`${k} ${tf}`];
+  return d && d.why ? d.why : `No story for ${k} ${tf} yet.`;
+}
+const textOf = (dec, key, empty) => (dec && dec[key] ? dec[key] : empty);
 export function vsaReply(dec, k, tf) {
   const d = dec && dec[`${k} ${tf}`];
   return d ? d.vsa : `No VSA read for ${k} ${tf} yet.`;
@@ -324,8 +341,15 @@ export function route(text, snap, env = {}, sc = null) {
   switch (cmd) {
     case "/start": case "/help": return help();
     case "/today": case "/board": case "/brief": case "/panel": case "/scan": case "/all": case "/strength": return todayReply(dec);
-    case "/chart": case "/status": case "/story": case "/levels": return need(sym(args[0]), (k) => chartReply(dec, k, tfOf(args[1])));
+    case "/chart": case "/status": case "/levels": return need(sym(args[0]), (k) => {
+      const tf = tfOf(args[1]);
+      return tf.endsWith("m") ? zoomReply(dec, k, tf) : chartReply(dec, k, tf);
+    });
+    case "/zoom": case "/ltf": return need(sym(args[0]), (k) => zoomReply(dec, k, tfOf(args[1], "15m")));
     case "/vsa": case "/effort": return need(sym(args[0]), (k) => vsaReply(dec, k, tfOf(args[1])));
+    case "/why": case "/story": return need(sym(args[0]), (k) => whyReply(dec, k, tfOf(args[1])));
+    case "/setups": case "/hitlist": return textOf(dec, "_setups", "No setups list yet — the robot writes it every hour.");
+    case "/dollar": case "/usd": case "/dx": return textOf(dec, "_dollar", "No dollar read yet.");
     case "/health": return health(snap);
     case "/news": return sc && sc.__news ? sc.__news : "No calendar yet — the robot fetches it every hour.";
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
@@ -335,8 +359,14 @@ export function route(text, snap, env = {}, sc = null) {
   const t = raw.toLowerCase();
   const k = findSymbol(t);
   const tf = /\b1h\b|hour/.test(t) ? "1h" : "4h";
+
   if (/\b(news|calendar|cpi|nfp|release)\b/.test(t)) return sc && sc.__news ? sc.__news : "No calendar yet.";
-  if (k && /\b(vsa|effort|volume|supply|demand)\b/.test(t)) return vsaReply(dec, k, tf);
+  const tfw = /\b5m\b|5 ?min/.test(t) ? "5m" : /\b15m\b|15 ?min/.test(t) ? "15m" : tf;
+  if (k && /\b(vsa|effort|volume|supply|demand)\b/.test(t)) return vsaReply(dec, k, tfw);
+  if (k && /\b(why|story|wyckoff)\b/.test(t)) return whyReply(dec, k, tfw);
+  if (k && /\b(zoom|ltf|15m|5m|lower|entry)\b/.test(t)) return zoomReply(dec, k, tfw.endsWith("m") ? tfw : "15m");
+  if (/\b(setups?|hit ?list|opportunit\w*)\b/.test(t)) return textOf(dec, "_setups", "No setups list yet.");
+  if (/\b(dollar|usd|dxy)\b/.test(t) && (!k || k === "DX")) return textOf(dec, "_dollar", "No dollar read yet.");
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (!k && /\b(today|brief|morning|board|market|overview|all|everything|dashboard|summary|scan|strength|panel)\b/.test(t)) return todayReply(dec);
   if (k) return chartReply(dec, k, tf);
@@ -363,12 +393,32 @@ async function loadScan(env) {
   if (b.ok) sc.__brief = (await b.json()).text;
   if (c.ok) sc.__panel = await c.json();
   if (d.ok) sc.__news = (await d.json()).text;
-  if (e.ok) sc.__dec = await e.json();
+  const gh = e.ok ? await e.json().catch(() => null) : null;
+  const kv = env.DESK ? await env.DESK.get("dec:latest", { type: "json" }).catch(() => null) : null;
+  sc.__dec = kv && (!gh || String(kv._at) >= String(gh._at)) ? kv : gh;   // /refresh writes KV first
   return sc;
 }
 
+// /refresh — start the robot-now workflow (needs the GH_TOKEN secret: a fine-grained token with Actions read & write)
+export async function refresh(env, args = []) {
+  if (!env.GH_TOKEN) return "⚠️ /refresh needs a GitHub token on the bot (secret GH_DISPATCH_TOKEN). Until then /today shows the latest hourly board.";
+  const k = args[0] ? findSymbol(args[0]) : null;
+  const what = k && k !== "DX" ? `${k} ${tfOf(args[1])}` : "";
+  const r = await fetch("https://api.github.com/repos/HAM-X/whs-data/actions/workflows/robot-now.yml/dispatches", {
+    method: "POST", body: JSON.stringify({ ref: "main", inputs: { what } }),
+    headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "pipdon-bot",
+               "content-type": "application/json" } });
+  return r.ok ? `⏳ Fresh read started${what ? " for " + what : ""} — ${what ? "the card" : "the board + Today"} arrives in about 2 minutes.`
+              : `⚠️ Could not start the fresh read (GitHub ${r.status}). /today shows the latest hourly board.`;
+}
+
 async function replyPhoto(env, chatId, name, caption) {
-  const img = env.DESK ? await env.DESK.get("img:" + name, { type: "arrayBuffer" }) : null;
+  let img = null;
+  if (env.DESK) {
+    const bundle = await env.DESK.get("img:bundle", { type: "json" }).catch(() => null);
+    if (bundle && bundle[name]) img = Uint8Array.from(atob(bundle[name]), (ch) => ch.charCodeAt(0));
+    else img = await env.DESK.get("img:" + name, { type: "arrayBuffer" });
+  }
   if (!img) return reply(env, chatId, caption);
   const fd = new FormData();
   fd.append("chat_id", String(chatId));
@@ -422,7 +472,8 @@ export default {
       return new Response("ok");
     }
     if (request.method !== "POST") {
-      const n = env.DESK ? (await env.DESK.list({ prefix: "img:" }).catch(() => ({ keys: [] }))).keys.length : 0;
+      const b = env.DESK ? await env.DESK.get("img:bundle", { type: "json" }).catch(() => null) : null;
+      const n = b ? Object.keys(b).length : 0;
       return new Response(`Pipdon BOT is running. Chart cards stored: ${n}.`, { status: 200 });
     }
     if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) return new Response("forbidden", { status: 403 });
@@ -433,6 +484,10 @@ export default {
     let text;
     const [c0, ...a0] = msg.text.trim().split(/\s+/);
     const dcmd = c0.toLowerCase().replace(/@.*$/, "");
+    if (dcmd === "/refresh" || /^(refresh|update now|fresh read)\b/i.test(msg.text.trim())) {
+      await reply(env, msg.chat.id, await refresh(env, a0));
+      return new Response("ok");
+    }
     if (DESK_CMDS.includes(dcmd)) {
       try {
         const snap = await loadSnapshot(env);

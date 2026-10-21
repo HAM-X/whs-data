@@ -15,8 +15,10 @@ test("aliases", () => {
 });
 
 const dec = {
-  _today: "<b>Today · Wed 21 Oct</b>\n<b>Act on</b>  nothing", _at: "x",
-  "6E 4h": { action: "WAIT", caption: "<b>6E · 4h</b>  ▸ <b>WAIT</b>", vsa: "<b>6E · 4h · VSA</b>" },
+  _today: "<b>Today · Wed 21 Oct</b>\n<b>Act on</b>  nothing", _at: "x", _setups: "<b>Setups</b>", _dollar: "<b>Dollar</b>",
+  "6E 15m": { action: "BUY ZONE", caption: "<b>6E · 15m</b>", vsa: "v15", why: "w15" },
+  "6E 5m": { action: "WAIT", caption: "<b>6E · 5m</b>", vsa: "v5", why: "w5" },
+  "6E 4h": { action: "WAIT", caption: "<b>6E · 4h</b>  ▸ <b>WAIT</b>", vsa: "<b>6E · 4h · VSA</b>", why: "<b>story</b>" },
   "6E 1h": { action: "BUY ZONE", caption: "<b>6E · 1h</b>  ▸ <b>BUY ZONE</b>", vsa: "<b>6E · 1h · VSA</b>" },
   "GC 4h": { action: "TREND ↓", caption: "<b>GC · 4h</b>", vsa: "<b>GC · 4h · VSA</b>" },
   "GC 1h": { action: "TREND ↓", caption: "<b>GC · 1h</b>", vsa: "x" },
@@ -39,6 +41,21 @@ test("v2 commands: photos for /today and /chart, text for /vsa, old commands map
     assert.ok(typeof out === "string" && out.length > 20 && out.length < 4000, q);
   }
   assert.match(route("/today", snap, {}, null), /No board yet/);
+});
+
+test("lower timeframes, setups, story, dollar", () => {
+  assert.deepEqual(route("/zoom 6E", snap, {}, sc), { photo: "card:6E:15m", caption: "<b>6E · 15m</b>" });
+  assert.equal(route("/zoom euro 5m", snap, {}, sc).photo, "card:6E:5m");
+  assert.equal(route("/chart 6E 5m", snap, {}, sc).photo, "card:6E:5m");
+  assert.equal(route("/vsa 6E 15m", snap, {}, sc), "v15");
+  assert.equal(route("euro 5m vsa", snap, {}, sc), "v5");
+  assert.equal(route("/why 6E", snap, {}, sc), "<b>story</b>");
+  assert.equal(route("why euro 15m", snap, {}, sc), "w15");
+  assert.equal(route("/setups", snap, {}, sc), "<b>Setups</b>");
+  assert.equal(route("any setups?", snap, {}, sc), "<b>Setups</b>");
+  assert.equal(route("/dollar", snap, {}, sc), "<b>Dollar</b>");
+  assert.equal(route("how is the dollar", snap, {}, sc), "<b>Dollar</b>");
+  assert.match(route("/zoom gc", snap, {}, sc), /No 15m read/);
 });
 
 test("/plan: GO with MT5 lots; REDUCE when the chart is against; NO in a blackout", async () => {

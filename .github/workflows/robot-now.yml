@@ -1,0 +1,38 @@
+name: robot-now
+# On demand (Pipdon BOT /refresh): a fresh read of every chart, sent straight to Telegram. Commits nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: "empty = board + Today · or 'KEY TF' e.g. '6E 15m'"
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: robot-now
+  cancel-in-progress: true
+jobs:
+  now:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          (sudo apt-get update -qq && sudo apt-get install -y -qq fonts-inter) > /dev/null 2>&1 || echo "Inter font not available"
+      - name: Fresh read
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WHAT: ${{ github.event.inputs.what }}
+        run: python -m jobs.now $WHAT

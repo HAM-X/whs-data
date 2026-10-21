@@ -44,3 +44,40 @@ def put_files(files: dict, prefix: str = "img:") -> int:
         except Exception as e:
             print(f"[kv error] {name}: {type(e).__name__}: {e}")
     return n
+
+
+def put_bundle(files: dict, key: str = "img:bundle") -> int:
+    """All images in ONE KV value ({name: base64 PNG}) — one write per hour instead of one per image
+    (the free plan allows 1,000 KV writes a day)."""
+    import base64
+    ns = namespace()
+    if not ns:
+        print("[kv skipped: no Cloudflare secrets or namespace]")
+        return 0
+    blob = {}
+    for name, path in files.items():
+        try:
+            with open(path, "rb") as f:
+                blob[name] = base64.b64encode(f.read()).decode()
+        except Exception as e:
+            print(f"[kv bundle] {name}: {e}")
+    try:
+        _req(API.format(acc=os.environ["CLOUDFLARE_ACCOUNT_ID"]) + f"/{ns}/values/{key}", "PUT",
+             json.dumps(blob).encode(), "application/json")
+        return len(blob)
+    except Exception as e:
+        print(f"[kv error] bundle: {type(e).__name__}: {e}")
+        return 0
+
+
+def put_json(key: str, obj) -> bool:
+    ns = namespace()
+    if not ns:
+        return False
+    try:
+        _req(API.format(acc=os.environ["CLOUDFLARE_ACCOUNT_ID"]) + f"/{ns}/values/{key}", "PUT",
+             json.dumps(obj, default=str).encode(), "application/json")
+        return True
+    except Exception as e:
+        print(f"[kv error] {key}: {type(e).__name__}: {e}")
+        return False

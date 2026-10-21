@@ -44,3 +44,21 @@ def test_vsa_symbols_and_bar():
     o2, c2 = o.copy(), c.copy()
     c2[-1] = c2[-2] + 0.00005                                             # tiny up bar on low effort
     assert vsa.bar(o2, np.maximum(h, c2), l, c2, eff, n - 1)["code"] == "D<"
+
+
+def test_ltf_alerts_only_for_entries_at_an_htf_edge_once():
+    nest = {"side": 1, "tf": "4h", "line": "x"}
+    dec = {"6E 15m": {"action": "BUY ZONE", "strong": True, "nest": nest}, "6B 15m": {"action": "BUY ZONE", "strong": False, "nest": nest},
+           "6A 5m": {"action": "WAIT", "strong": False, "nest": nest}}
+    seen = {"6E 15m": "WAIT", "6B 15m": "WAIT", "6A 5m": "BUY ZONE"}
+    assert cards.changes(dec, seen) == [("6E 15m", "WAIT", "BUY ZONE at the 4h edge")]
+    assert cards.changes(dec, {"6E 15m": "BUY ZONE ✅"}) == []           # already alerted
+
+
+def test_nested_edges():
+    d4 = {"action": "WAIT", "levels": [1.10, 1.12]}
+    assert cards.nested(1.1005, d4, None)["side"] == 1
+    assert cards.nested(1.0960, d4, None)["side"] == 1                 # spring territory below support
+    assert cards.nested(1.1195, d4, None)["side"] == -1
+    assert cards.nested(1.1100, d4, None)["side"] == 0
+    assert cards.nested(1.2000, d4, None)["side"] == 0

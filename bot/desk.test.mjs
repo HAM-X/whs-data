@@ -83,3 +83,13 @@ test("/account: one screen, setters update it", async () => {
   const out = deskRoute("/account", ["pnl", "-2.6"], st, { instruments: {} }, T0);
   assert.match(out, /BLOCKED/); assert.match(out, /−?-?2\.60%/);
 });
+
+
+test("/journal: stats and last trades", async () => {
+  const { deskRoute } = await import("./desk.js");
+  const st = emptyState();
+  assert.match(deskRoute("/journal", [], st, { instruments: {} }, T0), /no closed trades/);
+  st.journal = [{ key: "6E", side: 1, r: 2, risk: 0.25, day: "2026-10-20" }, { key: "GC", side: -1, r: -1, risk: 0.5, day: "2026-10-21" }];
+  const out = deskRoute("/journal", [], st, { instruments: {} }, T0);
+  assert.match(out, /2 trades · win 50% · avg \+0\.50R · total \+1\.00R/);
+});

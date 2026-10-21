@@ -45,7 +45,7 @@ def _chip(fig, x, y, text, color, size=26, pad=0.012):
 
 
 def chart_card(key: str, tf: str, d: pd.DataFrame, eff: np.ndarray, rec: dict, dec: dict, vs: dict,
-               news_line: str = "", out: str = "card.png", n: int = 120) -> str:
+               news_line: str = "", out: str = "card.png", n: int = 120, htf_lines: list | None = None) -> str:
     t = pd.to_datetime(d["time"], utc=True).dt.tz_convert(LOCAL)
     o, h, l, c = (d[x].to_numpy(float) for x in ("open", "high", "low", "close"))
     i0 = max(0, len(c) - n)
@@ -90,6 +90,12 @@ def chart_card(key: str, tf: str, d: pd.DataFrame, eff: np.ndarray, rec: dict, d
             ax.annotate(name, (b - i0, y), xytext=(0, 14 if above else -16), textcoords="offset points", ha="center",
                         va="bottom" if above else "top", fontsize=14, fontweight="bold",
                         color=INK if state == "confirmed" else QUIET)
+    # higher-timeframe edges (15m / 5m cards): dashed, labelled at the left
+    for lab, lv in (htf_lines or []):
+        if lo_v - (hi_v - lo_v) * 0.6 <= lv <= hi_v + (hi_v - lo_v) * 0.6:
+            ax.axhline(lv, color="#C99A06", lw=1.3, ls=(0, (5, 3)), alpha=0.9)
+            ax.text(0, lv, f" {lab} {lv:.5g}", fontsize=12, color="#8A6A00", va="bottom", fontweight="bold")
+            lo_v, hi_v = min(lo_v, lv), max(hi_v, lv)
     # candles
     for i in range(i0, len(c)):
         col = UP if c[i] >= o[i] else DN
@@ -133,7 +139,7 @@ def chart_card(key: str, tf: str, d: pd.DataFrame, eff: np.ndarray, rec: dict, d
     # ---------- decision panel ----------
     fig.patches.append(FancyBboxPatch((0.04, 0.015), 0.92, 0.325, boxstyle="round,pad=0,rounding_size=0.015",
                                       transform=fig.transFigure, fc=PANEL, ec="none"))
-    rows = [("DO", dec["do"]), ("TRIGGER", dec["trigger"])]
+    rows = [("DO", dec["do"])] + ([("HTF", dec["htf"])] if dec.get("htf") else []) + [("TRIGGER", dec["trigger"])]
     if dec.get("invalid") and dec["invalid"] != "—":
         rows.append(("INVALID", dec["invalid"]))
     elif g:
