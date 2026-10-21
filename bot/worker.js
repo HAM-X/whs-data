@@ -421,7 +421,10 @@ export default {
       await reply(env, env.TELEGRAM_CHAT_ID, tvMessage(await request.text()));
       return new Response("ok");
     }
-    if (request.method !== "POST") return new Response("Pipdon BOT is running.", { status: 200 });
+    if (request.method !== "POST") {
+      const n = env.DESK ? (await env.DESK.list({ prefix: "img:" }).catch(() => ({ keys: [] }))).keys.length : 0;
+      return new Response(`Pipdon BOT is running. Chart cards stored: ${n}.`, { status: 200 });
+    }
     if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) return new Response("forbidden", { status: 403 });
     const update = await request.json().catch(() => ({}));
     const msg = update.message || update.edited_message;
