@@ -135,3 +135,21 @@ test("/news and plain 'any news today' answer from news.json", async () => {
   assert.equal(route("/news", {}, {}, sc), "📰 News · test");
   assert.equal(route("any news today?", {}, {}, sc), "📰 News · test");
 });
+
+
+test("fresh or instant: any pair, timeframe and analysis", async () => {
+  const { freshAsk } = await import("./worker.js");
+  const now = Date.parse("2026-10-21T09:20:00Z");
+  const d = { _at: "2026-10-21T09:12:00Z", "6E 4h": { action: "WAIT" }, "6E 15m": { action: "WAIT" }, "GC 15m": { action: "WAIT" } };
+  assert.equal(freshAsk("/vsa 6E", d, now), null);                       // hourly read is 8 min old → instant
+  assert.equal(freshAsk("/vsa gc 15m", d, now), null);
+  assert.equal(freshAsk("/vsa gc 15m", d, Date.parse("2026-10-21T09:40:00Z")), "vsa gc 15m");   // 28 min old on 15m → fresh
+  assert.equal(freshAsk("/vsa 6B 15m", d, now), "vsa 6B 15m");           // not precomputed → fresh
+  assert.equal(freshAsk("/chart 6E daily", d, now), "chart 6E daily");    // daily is always fresh
+  assert.equal(freshAsk("gc 15m vsa trend", d, now), "gc 15m vsa trend");
+  assert.equal(freshAsk("/trend euro", d, now), "trend euro 4h");
+  assert.equal(freshAsk("euro 4h vsa now", d, now), "euro 4h vsa");
+  assert.equal(freshAsk("/read cable 30m", d, now), "all cable 30m");
+  assert.equal(freshAsk("/today", d, now), null);
+  assert.equal(freshAsk("how is the dollar", d, now), null);
+});

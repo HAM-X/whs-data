@@ -7,11 +7,15 @@ on:
         description: "empty = board + Today · or 'KEY TF' e.g. '6E 15m'"
         required: false
         default: ""
+      ask:
+        description: "a question to answer fresh, e.g. 'gc 15m vsa trend' (overrides what)"
+        required: false
+        default: ""
 permissions:
   contents: read
 concurrency:
-  group: robot-now
-  cancel-in-progress: true
+  group: robot-now-${{ github.event.inputs.ask != '' && github.run_id || 'board' }}
+  cancel-in-progress: false
 jobs:
   now:
     runs-on: ubuntu-latest
@@ -35,4 +39,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WHAT: ${{ github.event.inputs.what }}
-        run: python -m jobs.now $WHAT
+          ASK: ${{ github.event.inputs.ask }}
+        run: |
+          if [ -n "$ASK" ]; then python -m jobs.ask; else python -m jobs.now $WHAT; fi

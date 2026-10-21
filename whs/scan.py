@@ -19,8 +19,8 @@ import pandas as pd
 from . import autorange, core, degrees, desk, ranges, story, swings
 from .config import EXCHANGE_TZ, FUTURES
 
-TF_MIN = {"1h": 60, "4h": 240, "15m": 15, "5m": 5}
-RECENT = {"1h": 360, "4h": 300, "15m": 400, "5m": 500}       # look for ranges whose climax is within this many bars of now
+TF_MIN = {"1h": 60, "4h": 240, "15m": 15, "5m": 5, "30m": 30, "1d": 1440, "1w": 10080}
+RECENT = {"1h": 360, "4h": 300, "15m": 400, "5m": 500, "30m": 400, "1d": 250, "1w": 150}       # look for ranges whose climax is within this many bars of now
 REACT_N = degrees.AR_N + degrees.MIN_BOX
 
 

@@ -53,6 +53,10 @@ export function help() {
     "/zoom 6E [5m] — the 15m / 5m structure read against the 4h / 1h range edges",
     "/vsa 6E [1h|15m|5m] — rallies, reactions and bars in VSA notation (V R D S)",
     "/why 6E [1h] — the Wyckoff story: events, phases, bias",
+    "/trend 6E [tf] — major trend, protected level, swing structure · /swings 6E [tf] — every swing in notation",
+    "/effort 6E [tf] — effort vs result bar by bar · /read 6E [tf] — everything at once",
+    "<b>Any pair, any timeframe (5m 15m 30m 1h 4h daily weekly), any mix — fresh in ≈1 min:</b>",
+    "  e.g. \"gc 15m vsa trend\" · \"yen daily why swings\" · \"euro 5m chart now\" · /ask cable 30m all",
     "/dollar — USD strong / weak / mixed and what it favours",
     "/news — red-folder releases, blackouts, how price answered",
     "",
@@ -348,6 +352,8 @@ export function route(text, snap, env = {}, sc = null) {
     case "/zoom": case "/ltf": return need(sym(args[0]), (k) => zoomReply(dec, k, tfOf(args[1], "15m")));
     case "/vsa": case "/effort": return need(sym(args[0]), (k) => vsaReply(dec, k, tfOf(args[1])));
     case "/why": case "/story": return need(sym(args[0]), (k) => whyReply(dec, k, tfOf(args[1])));
+    case "/trend": case "/swings": case "/read": case "/ask":
+      return "This one is read fresh from the market — the bot needs its GitHub token for that (see /refresh).";
     case "/setups": case "/hitlist": return textOf(dec, "_setups", "No setups list yet — the robot writes it every hour.");
     case "/dollar": case "/usd": case "/dx": return textOf(dec, "_dollar", "No dollar read yet.");
     case "/health": return health(snap);
@@ -397,6 +403,45 @@ async function loadScan(env) {
   const kv = env.DESK ? await env.DESK.get("dec:latest", { type: "json" }).catch(() => null) : null;
   sc.__dec = kv && (!gh || String(kv._at) >= String(gh._at)) ? kv : gh;   // /refresh writes KV first
   return sc;
+}
+
+// ---------- fresh answers: any pair, any timeframe, any analysis (robot-now → jobs/ask.py, ≈ 1 min) ----------
+const PRE_TF = ["4h", "1h", "15m", "5m"];                 // what the hourly robot precomputes
+const ANALYSIS = { "/chart": "chart", "/zoom": "chart", "/ltf": "chart", "/status": "chart", "/levels": "chart", "/vsa": "vsa",
+  "/why": "why", "/story": "why", "/effort": "effort", "/trend": "trend", "/swings": "swings", "/read": "all", "/ask": "" };
+export function tfIn(text) {
+  const m = String(text).toLowerCase().match(/\b(5m|15m|30m|1h|60m|4h|1d|daily|day|1w|weekly|week)\b/);
+  if (!m) return null;
+  return { "60m": "1h", daily: "1d", day: "1d", weekly: "1w", week: "1w" }[m[1]] || m[1];
+}
+// Is this question answered from the hourly read (instant) or fresh (robot-now)? Returns null (instant) or the ask text.
+export function freshAsk(text, dec, now = Date.now()) {
+  const raw = String(text || "").trim();
+  const [c0, ...rest] = raw.split(/\s+/);
+  const cmd = c0.toLowerCase().replace(/@.*$/, "");
+  const k = findSymbol(raw);
+  const isCmd = cmd in ANALYSIS;
+  const plain = !cmd.startsWith("/") && k && /\b(vsa|effort|result|volume|trend|structure|swings?|why|story|wyckoff|chart|zoom|ltf|now|fresh|live|\d+m|\d[hdw]|daily|weekly)\b/i.test(raw);
+  if (!k || (!isCmd && !plain)) return null;
+  const want = isCmd ? ANALYSIS[cmd] : "";
+  const tf = tfIn(raw) || (cmd === "/zoom" || cmd === "/ltf" ? "15m" : "4h");
+  const forced = /\b(now|fresh|live)\b/i.test(raw) || cmd === "/ask" || cmd === "/read";
+  const words = (want ? want + " " : "") + (isCmd ? rest.join(" ") : raw);
+  const ask = words.replace(/\b(now|fresh|live)\b/gi, "").trim() + (tfIn(words) ? "" : " " + tf);
+  if (forced || !PRE_TF.includes(tf) || ["effort", "trend", "swings", "all"].includes(want)) return ask;
+  if (!isCmd && /\b(effort|result|trend|structure|swings?)\b/i.test(raw)) return ask;
+  const d = dec && dec[`${k} ${tf}`];
+  const ageMin = dec && dec._at ? (now - Date.parse(dec._at)) / 60000 : 1e9;
+  if (!d || ageMin > (tf.endsWith("m") ? 20 : 75)) return ask;
+  return null;
+}
+export async function askFresh(env, ask) {
+  if (!env.GH_TOKEN) return null;
+  const r = await fetch("https://api.github.com/repos/HAM-X/whs-data/actions/workflows/robot-now.yml/dispatches", {
+    method: "POST", body: JSON.stringify({ ref: "main", inputs: { what: "", ask } }),
+    headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "pipdon-bot",
+               "content-type": "application/json" } });
+  return r.ok;
 }
 
 // /refresh — start the robot-now workflow (needs the GH_TOKEN secret: a fine-grained token with Actions read & write)
@@ -510,7 +555,14 @@ export default {
     }
     try {
       const sc = wantsScan(msg.text) ? await loadScan(env).catch(() => null) : null;
-      text = route(msg.text, await loadSnapshot(env), env, sc);
+      const ask = freshAsk(msg.text, sc && sc.__dec);
+      if (ask) {
+        const ok = await askFresh(env, ask);
+        if (ok) { await reply(env, msg.chat.id, `⚡ Reading <b>${esc(ask)}</b> fresh from the market — about a minute.`); return new Response("ok"); }
+        if (ok === false) text = "⚠️ Could not start the fresh read — showing the hourly one.\n\n";
+      }
+      const out = route(msg.text, await loadSnapshot(env), env, sc);
+      text = text && typeof out === "string" ? text + out : out;
     } catch (e) {
       text = `⚠️ Could not read the robot's snapshot (${esc(e.message)}). Try again in a minute.`;
     }

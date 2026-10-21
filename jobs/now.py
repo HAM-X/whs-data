@@ -24,7 +24,10 @@ def main(argv: list[str]) -> None:
         telegram.send("⚠️ Fresh read failed — the hourly board is still there: /today")
         return
     dec, imgs = made
-    cfkv.put_json("dec:latest", dec)
+    ok = cfkv.put_json("dec:latest", dec)
+    ltf = sorted(k for k in dec if k.endswith("m"))
+    print(f"::notice title=now::images {len(imgs)} · decisions {len([k for k in dec if not k.startswith('_')])} · "
+          f"15m/5m {len(ltf)} · KV decisions {'ok' if ok else 'FAILED'}")
     if len(argv) >= 1:
         key = argv[0].upper()
         tf = argv[1] if len(argv) > 1 else "4h"
