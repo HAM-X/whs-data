@@ -2,5 +2,23 @@
  "problems": {},
  "last_ok_day": "2026-10-21",
  "last_brief_day": "2026-10-21",
- "news_alerted": []
+ "news_alerted": [],
+ "decisions": {
+  "6E 4h": "WAIT",
+  "6E 1h": "WAIT",
+  "6B 4h": "TREND \u2191",
+  "6B 1h": "WAIT",
+  "6A 4h": "SIDEWAYS",
+  "6A 1h": "WAIT",
+  "6N 4h": "TREND \u2191",
+  "6N 1h": "TREND \u2191",
+  "6J 4h": "WAIT",
+  "6J 1h": "TREND \u2193",
+  "6C 4h": "TREND \u2191",
+  "6C 1h": "WAIT",
+  "6S 4h": "TREND \u2191",
+  "6S 1h": "WAIT",
+  "GC 4h": "TREND \u2193",
+  "GC 1h": "TREND \u2193"
+ }
 }
