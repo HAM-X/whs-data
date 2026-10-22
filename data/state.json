@@ -12,7 +12,7 @@
   "6E 5m": "WAIT",
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
-  "6B 15m": "TREND \u2191",
+  "6B 15m": "TREND \u2193",
   "6B 5m": "TREND \u2193",
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
