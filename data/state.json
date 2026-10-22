@@ -17,7 +17,7 @@
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "WAIT",
-  "6A 5m": "TREND \u2193",
+  "6A 5m": "WAIT",
   "6N 4h": "TREND \u2191",
   "6N 1h": "TREND \u2193",
   "6N 15m": "WAIT",
@@ -37,6 +37,6 @@
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2193",
   "GC 15m": "WAIT",
-  "GC 5m": "SELL RALLIES"
+  "GC 5m": "TREND \u2193"
  }
 }
