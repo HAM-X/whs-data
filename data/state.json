@@ -25,7 +25,7 @@
   "6J 4h": "WAIT",
   "6J 1h": "SIDEWAYS",
   "6J 15m": "TREND \u2191",
-  "6J 5m": "WAIT",
+  "6J 5m": "TREND \u2191",
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
   "6C 15m": "WAIT",
