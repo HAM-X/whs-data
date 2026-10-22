@@ -1,7 +1,9 @@
 {
- "problems": {},
+ "problems": {
+  "GC:gaps": "GC: 1 missing hour(s) in the last day"
+ },
  "last_ok_day": "2026-10-21",
- "last_brief_day": "2026-10-21",
+ "last_brief_day": "2026-10-22",
  "news_alerted": [
   "NZD|CPI q/q|2026-10-21T21:45:00+00:00"
  ],
@@ -20,7 +22,7 @@
   "6A 5m": "SIDEWAYS",
   "6N 4h": "TREND \u2191",
   "6N 1h": "TREND \u2193",
-  "6N 15m": "TREND \u2191",
+  "6N 15m": "TREND \u2193",
   "6N 5m": "TREND \u2191",
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2191",
