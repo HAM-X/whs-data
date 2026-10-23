@@ -23,7 +23,7 @@
   "6N 15m": "WAIT",
   "6N 5m": "WAIT",
   "6J 4h": "WAIT",
-  "6J 1h": "SIDEWAYS",
+  "6J 1h": "TREND \u2191",
   "6J 15m": "TREND \u2191",
   "6J 5m": "TREND \u2191",
   "6C 4h": "TREND \u2191",
@@ -36,7 +36,7 @@
   "6S 5m": "WAIT",
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2193",
-  "GC 15m": "WAIT",
+  "GC 15m": "TREND \u2193",
   "GC 5m": "TREND \u2193"
  }
 }
