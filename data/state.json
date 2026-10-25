@@ -1,5 +1,14 @@
 {
- "problems": {},
+ "problems": {
+  "DX:stale": "DX: newest bar is 50h behind",
+  "EURUSD:stale": "EURUSD: newest bar is 49h behind",
+  "GBPUSD:stale": "GBPUSD: newest bar is 49h behind",
+  "AUDUSD:stale": "AUDUSD: newest bar is 49h behind",
+  "NZDUSD:stale": "NZDUSD: newest bar is 49h behind",
+  "USDJPY:stale": "USDJPY: newest bar is 50h behind",
+  "USDCAD:stale": "USDCAD: newest bar is 49h behind",
+  "USDCHF:stale": "USDCHF: newest bar is 49h behind"
+ },
  "last_ok_day": "2026-10-23",
  "last_brief_day": "2026-10-23",
  "news_alerted": [
@@ -29,7 +38,7 @@
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
   "6C 15m": "TREND \u2191",
-  "6C 5m": "TREND \u2191",
+  "6C 5m": "TREND \u2193",
   "6S 4h": "WAIT",
   "6S 1h": "WAIT",
   "6S 15m": "WAIT",
