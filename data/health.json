@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-10-25T04:12:00.951577+00:00",
- "run_local": "Sun 25 Oct 07:12",
+ "run_utc": "2026-10-25T05:12:01.050755+00:00",
+ "run_local": "Sun 25 Oct 08:12",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -57,7 +57,7 @@
    "yahoo": "6J=F",
    "bars": 11555,
    "added": 0,
-   "revised": 1,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-10-23T20:00:00+00:00",
    "last_local": "Fri 23 Oct 23:00",
