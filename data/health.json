@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-10-25T21:12:01.618622+00:00",
- "run_local": "Mon 26 Oct 00:12",
+ "run_utc": "2026-10-25T22:12:01.022302+00:00",
+ "run_local": "Mon 26 Oct 01:12",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -33,7 +33,7 @@
    "yahoo": "6A=F",
    "bars": 11555,
    "added": 0,
-   "revised": 0,
+   "revised": 1,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-10-23T20:00:00+00:00",
    "last_local": "Fri 23 Oct 23:00",
@@ -45,7 +45,7 @@
    "yahoo": "6N=F",
    "bars": 11557,
    "added": 0,
-   "revised": 0,
+   "revised": 1,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-10-23T20:00:00+00:00",
    "last_local": "Fri 23 Oct 23:00",
