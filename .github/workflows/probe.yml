@@ -1,7 +1,13 @@
 name: probe
-# Manual diagnostic: what Yahoo returns for the futures on 15m and 5m (rows, first/last bar, volume present). Changes nothing.
+# Manual diagnostic: answer a question with jobs/ask.py WITHOUT sending it to Telegram; the answer comes back as
+# annotations (readable through the API). Changes nothing.
 on:
   workflow_dispatch:
+    inputs:
+      q:
+        description: "question, e.g. '6e 5m vsa trend'"
+        required: true
+        default: "6e 5m vsa"
 permissions:
   contents: read
 jobs:
@@ -12,18 +18,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
-      - run: |
+      - env:
+          Q: ${{ github.event.inputs.q }}
+        run: |
           python - <<'PY'
-          import yfinance as yf, time
-          rows = []
-          for t in ["6E=F", "6B=F", "6A=F", "6N=F", "6J=F", "6C=F", "6S=F", "GC=F"]:
-              for iv, per in (("15m", "60d"), ("5m", "60d"), ("5m", "5d")):
-                  t0 = time.time()
-                  try:
-                      d = yf.Ticker(t).history(period=per, interval=iv, prepost=True, auto_adjust=False, actions=False, timeout=30)
-                      rows.append(f"{t} {iv} {per}: {len(d)} rows {d.index[0] if len(d) else ''} → {d.index[-1] if len(d) else ''} vol>0 {int((d.Volume > 0).mean() * 100) if len(d) else 0}% {time.time() - t0:.1f}s")
-                  except Exception as e:
-                      rows.append(f"{t} {iv} {per}: ERROR {type(e).__name__}: {e}")
-          print("::notice title=yahoo intraday::" + "%0A".join(rows))
+          import os, re
+          import jobs.ask as A
+          out = []
+          A.answer(os.environ["Q"], send_text=lambda t, html=False: out.append(t), send_photo=lambda p, c: out.append("[card]\n" + c))
+          for i, block in enumerate(out):
+              txt = re.sub(r"<[^>]+>", "", block).replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+              print(f"::notice title=probe {i}::" + txt.replace("%", "%25").replace("\n", "%0A")[:3900])
           PY
