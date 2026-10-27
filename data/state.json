@@ -21,7 +21,7 @@
   "6N 4h": "WAIT",
   "6N 1h": "TREND \u2193",
   "6N 15m": "TREND \u2193",
-  "6N 5m": "TREND \u2193",
+  "6N 5m": "TREND \u2191",
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2193",
   "6J 15m": "SELL ZONE",
