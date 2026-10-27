@@ -17,7 +17,7 @@
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "TREND \u2191",
-  "6A 5m": "WAIT",
+  "6A 5m": "TREND \u2191",
   "6N 4h": "WAIT",
   "6N 1h": "TREND \u2191",
   "6N 15m": "TREND \u2191",
@@ -25,7 +25,7 @@
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2193",
   "6J 15m": "SELL ZONE",
-  "6J 5m": "TREND \u2193",
+  "6J 5m": "WATCH",
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
   "6C 15m": "WAIT",
@@ -35,9 +35,11 @@
   "6S 15m": "TREND \u2193",
   "6S 5m": "TREND \u2193",
   "GC 4h": "TREND \u2193",
-  "GC 1h": "SIDEWAYS",
+  "GC 1h": "TREND \u2191",
   "GC 15m": "WAIT",
-  "GC 5m": "WAIT"
+  "GC 5m": "TREND \u2191"
  },
- "watch": {}
+ "watch": {
+  "6A 1h": "resistance@0.703"
+ }
 }
