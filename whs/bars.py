@@ -26,7 +26,8 @@ def normalise(df: pd.DataFrame, now=None, step=pd.Timedelta(hours=1)) -> pd.Data
         "volume": d["volume"].fillna(0).to_numpy(dtype=float) if "volume" in d else 0.0,
     })
     out = out.dropna(subset=["open", "high", "low", "close"])
-    out = out[out["time"] == out["time"].dt.floor("h")]          # hourly grid only
+    grid = "h" if step >= pd.Timedelta(hours=1) else f"{int(step.total_seconds() // 60)}min"
+    out = out[out["time"] == out["time"].dt.floor(grid)]         # the bar grid of this timeframe (hourly, 15 min, 5 min)
     if now is not None:                                            # drop the bar still forming
         out = out[out["time"] + step <= pd.Timestamp(now).tz_convert("UTC")]
     out["time_ct"] = out["time"].dt.tz_convert(EXCHANGE_TZ)
