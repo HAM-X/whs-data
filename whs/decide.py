@@ -69,7 +69,7 @@ def _chart(r: dict, blackout: list | None = None, local=lambda iso: iso) -> dict
         return dict(action="BUY ZONE", tone="BUY", do=f"{last} confirmed at {_p(lastp)} — the proven setup (POE 1)",
                     trigger=f"long while it holds above {_p(lastp)}; target {_p(R)} then {_p(R + (R - S))}",
                     invalid=f"close below {_p(lastp)}", watch=name, short=f"{last} {_p(lastp)} · hold above")
-    if ph == "C" and last in ("UTAD", "Test of the UTAD", "UT") and out <= 0:
+    if ph == "C" and (last.startswith("UTAD") or last == "Test of the UTAD") and out <= 0:   # same as the Pine card (roles)
         return dict(action="SELL ZONE", tone="SELL", do=f"{last} confirmed at {_p(lastp)} — the proven setup (POE 1)",
                     trigger=f"short while it holds below {_p(lastp)}; target {_p(S)} then {_p(S - (R - S))}",
                     invalid=f"close above {_p(lastp)}", watch=name, short=f"{last} {_p(lastp)} · hold below")
