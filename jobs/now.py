@@ -35,7 +35,10 @@ def main(argv: list[str]) -> None:
         if name in imgs and k in dec:
             telegram.send_photo(imgs[name], "⚡ fresh · " + dec[k]["caption"])
             return
-    telegram.send_photo(imgs["board"], "⚡ fresh · " + dec["_today"])
+    hv = dec.get("_hourly") or {}
+    telegram.send_photo(imgs["board"], "⚡ fresh · " + (hv.get("caption") or dec["_today"]))
+    if hv.get("body"):
+        telegram.send(hv["body"], html=True)
 
 
 if __name__ == "__main__":
