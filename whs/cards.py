@@ -94,6 +94,36 @@ def nested(price: float, d4: dict | None, d1: dict | None) -> dict:
     return dict(side=0, tf=None, level=None, line=f"no 4h / 1h range at price ({acts})")
 
 
+WATCH_ATR = 0.3          # an edge is "in play" within 0.3 ATR of it (or up to half the range beyond it)
+
+
+def watch(price: float, atr: float, dec: dict) -> dict | None:
+    """Price at the edge of a WAITING range: the place a spring / UTAD — the proven setup — would happen."""
+    if dec.get("action") not in ("WAIT", "WATCH") or not dec.get("levels") or not atr or np.isnan(atr):
+        return None
+    S, R = dec["levels"]
+    H = R - S
+    if H <= 0:
+        return None
+    if S - 0.5 * H <= price <= S + WATCH_ATR * atr:
+        return dict(edge="support", level=S, side=1, beyond=bool(price < S))
+    if R - WATCH_ATR * atr <= price <= R + 0.5 * H:
+        return dict(edge="resistance", level=R, side=-1, beyond=bool(price > R))
+    return None
+
+
+def watch_text(k: str, w: dict) -> str:
+    key, tf = k.split()
+    if w["side"] == 1:
+        what = ("below" if w["beyond"] else "at") + f" its support {_p(w['level'])}"
+        nxt = "a spring that closes back above it = BUY ZONE (the proven setup)"
+    else:
+        what = ("above" if w["beyond"] else "at") + f" its resistance {_p(w['level'])}"
+        nxt = "a UTAD that closes back below it = SELL ZONE (the proven setup)"
+    return (f"👀 <b>{k} · price {what}</b>\n{_esc(nxt)}\n"
+            f"<i>Prepare: /zoom {key} for the 15m · /zoom {key} 5m · /why {key} {tf}</i>")
+
+
 def why_text(key: str, tf: str, rec: dict, dec: dict) -> str:
     g = (rec.get("ranges") or [None])[-1]
     out = [f"<b>{key} · {tf} · the Wyckoff story</b>  ▸ <b>{_esc(dec['action'])}</b>", ""]
@@ -153,7 +183,9 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
                 print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
             dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
                                           caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs),
-                                          why=why_text(key, tf, rec, dec), price=float(c[-1]))
+                                          why=why_text(key, tf, rec, dec), price=float(c[-1]),
+                                          bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]))
+            dec_all[f"{key} {tf}"]["watch"] = watch(float(c[-1]), dec_all[f"{key} {tf}"]["atr"], dec_all[f"{key} {tf}"])
             row["d4" if tf == "4h" else "d1"] = dec
             if tf == "4h":
                 row["ctrl"] = vs["verdict"]

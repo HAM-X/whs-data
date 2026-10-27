@@ -21,6 +21,21 @@ def _p(x) -> str:
 def chart(r: dict, blackout: list | None = None, local=lambda iso: iso) -> dict:
     d = _chart(r, blackout, local)
     d.setdefault("short", d["do"][:34])
+    # numbers for the live self-grade (Edge Lab 7.4): side, stop (the invalidation), target (the measured move)
+    g = (r.get("ranges") or [None])[-1]
+    if g and d["action"] in ("BUY ZONE", "SELL ZONE", "BUY PULLBACKS", "SELL RALLIES"):
+        S, R = g["support"], g["resistance"]
+        conf = [e for e in g["events"] if e[2] == "confirmed"]
+        lastp = conf[-1][3] if conf else None
+        side = 1 if d["action"] in ("BUY ZONE", "BUY PULLBACKS") else -1
+        if d["action"] == "BUY ZONE":
+            stop = lastp
+        elif d["action"] == "SELL ZONE":
+            stop = lastp
+        else:
+            stop = R if side == 1 else S
+        d.update(side=side, stop=None if stop is None else float(stop),
+                 target=float(R + (R - S)) if side == 1 else float(S - (R - S)))
     return d
 
 

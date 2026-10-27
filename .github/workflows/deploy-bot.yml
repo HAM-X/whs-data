@@ -122,6 +122,7 @@ jobs:
             {"command":"close","description":"Close a trade — /close 6E [price]"},
             {"command":"account","description":"Can I trade? Today, drawdown, open risk"},
             {"command":"journal","description":"Closed trades: win rate, average R, last 10"},
+            {"command":"calls","description":"The robot calls, scored live"},
             {"command":"help","description":"What Pipdon BOT does"}]}' > /dev/null
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \

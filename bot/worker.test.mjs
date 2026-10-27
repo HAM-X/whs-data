@@ -153,3 +153,16 @@ test("fresh or instant: any pair, timeframe and analysis", async () => {
   assert.equal(freshAsk("/today", d, now), null);
   assert.equal(freshAsk("how is the dollar", d, now), null);
 });
+
+
+test("dead-man switch: down once, then back; quiet when the market is closed", async () => {
+  const { deadmanCheck, marketOpen } = await import("./worker.js");
+  const tue = Date.parse("2026-10-27T10:00:00Z");
+  assert.equal(deadmanCheck("2026-10-27T09:12:00Z", null, tue), "ok");
+  assert.equal(deadmanCheck("2026-10-27T07:12:00Z", null, tue), "down");
+  assert.equal(deadmanCheck("2026-10-27T07:12:00Z", "1", tue), "still");
+  assert.equal(deadmanCheck("2026-10-27T09:40:00Z", "1", tue), "back");
+  assert.equal(marketOpen(Date.parse("2026-10-31T12:00:00Z")), false);      // Saturday
+  assert.equal(deadmanCheck("2026-10-30T20:12:00Z", null, Date.parse("2026-10-31T12:00:00Z")), "ok");
+  assert.equal(deadmanCheck("2026-11-01T10:00:00Z", null, Date.parse("2026-11-01T23:30:00Z")), "ok");   // just after the Sunday open
+});

@@ -65,6 +65,7 @@ export function help() {
     "/open … · /trades · /close 6E [price] — the bot manages the stop hourly",
     "/account — can I trade, today, drawdown, open risk, last trades",
     "/journal — your closed trades: win rate, average R, last 10",
+    "/calls — the robot's own calls, scored live (Saturday report)",
     "",
     "<i>Plain words work too: \"euro\", \"gold vsa 15m\", \"why yen\", \"setups\", \"dollar\", \"any news\".</i>",
   ].join("\n");
@@ -356,6 +357,7 @@ export function route(text, snap, env = {}, sc = null) {
       return "This one is read fresh from the market — the bot needs its GitHub token for that (see /refresh).";
     case "/setups": case "/hitlist": return textOf(dec, "_setups", "No setups list yet — the robot writes it every hour.");
     case "/dollar": case "/usd": case "/dx": return textOf(dec, "_dollar", "No dollar read yet.");
+    case "/calls": case "/grade": return textOf(dec, "_calls", "No self-grade yet — the robot scores its calls every hour.");
     case "/health": return health(snap);
     case "/news": return sc && sc.__news ? sc.__news : "No calendar yet — the robot fetches it every hour.";
     case "/convert": return need(sym(args[0]), (k) => convert(snap, k, parseFloat(args[1])));
@@ -372,6 +374,7 @@ export function route(text, snap, env = {}, sc = null) {
   if (k && /\b(why|story|wyckoff)\b/.test(t)) return whyReply(dec, k, tfw);
   if (k && /\b(zoom|ltf|15m|5m|lower|entry)\b/.test(t)) return zoomReply(dec, k, tfw.endsWith("m") ? tfw : "15m");
   if (/\b(setups?|hit ?list|opportunit\w*)\b/.test(t)) return textOf(dec, "_setups", "No setups list yet.");
+  if (/\b(calls|self.?grade|track record|how (is|has) the robot)\b/.test(t)) return textOf(dec, "_calls", "No self-grade yet.");
   if (/\b(dollar|usd|dxy)\b/.test(t) && (!k || k === "DX")) return textOf(dec, "_dollar", "No dollar read yet.");
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
   if (!k && /\b(today|brief|morning|board|market|overview|all|everything|dashboard|summary|scan|strength|panel)\b/.test(t)) return todayReply(dec);
@@ -444,6 +447,44 @@ export async function askFresh(env, ask) {
   return r.ok;
 }
 
+// ---------- dead-man switch: the robot must have run in the last 100 minutes while CME FX trades ----------
+export function marketOpen(ms = Date.now()) {
+  const d = new Date(ms), wd = d.getUTCDay(), h = d.getUTCHours();
+  if (wd === 6) return false;                       // Saturday
+  if (wd === 5 && h >= 21) return false;            // Friday after the close
+  if (wd === 0 && h < 23) return false;             // Sunday before the open
+  return true;
+}
+export function deadmanCheck(lastAt, flag, now = Date.now()) {
+  const age = lastAt ? (now - Date.parse(lastAt)) / 60000 : 1e9;
+  if (age > 100 && marketOpen(now) && marketOpen(now - 100 * 60000)) return flag ? "still" : "down";
+  if (age <= 100 && flag) return "back";
+  return "ok";
+}
+async function deadman(env) {
+  if (!env.DESK) return;
+  const dec = await env.DESK.get("dec:latest", { type: "json" }).catch(() => null);
+  const flag = await env.DESK.get("deadman");
+  const state = deadmanCheck(dec && dec._at, flag);
+  const last = dec && dec._at ? new Date(Date.parse(dec._at) + 3 * 3600e3).toISOString().slice(11, 16) : "—";
+  if (state === "down") {
+    let restarted = false;
+    if (env.GH_TOKEN) {
+      const r = await fetch("https://api.github.com/repos/HAM-X/whs-data/actions/workflows/robot-hourly.yml/dispatches", {
+        method: "POST", body: JSON.stringify({ ref: "main" }),
+        headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json", "User-Agent": "pipdon-bot",
+                   "content-type": "application/json" } }).catch(() => null);
+      restarted = !!(r && r.ok);
+    }
+    await env.DESK.put("deadman", String(Date.now()));
+    await reply(env, env.TELEGRAM_CHAT_ID, `⚠️ <b>The robot has not run since ${last} UTC+3.</b> ` +
+      (restarted ? "I restarted it — a fresh board should follow within ~10 minutes." : "Could not restart it — trust TradingView until it is back."));
+  } else if (state === "back") {
+    await env.DESK.delete("deadman");
+    await reply(env, env.TELEGRAM_CHAT_ID, `✅ The robot is back (last run ${last} UTC+3).`);
+  }
+}
+
 // /refresh — start the robot-now workflow (needs the GH_TOKEN secret: a fine-grained token with Actions read & write)
 export async function refresh(env, args = []) {
   if (!env.GH_TOKEN) return "⚠️ /refresh needs a GitHub token on the bot (secret GH_DISPATCH_TOKEN). Until then /today shows the latest hourly board.";
@@ -502,6 +543,7 @@ export default {
   // hourly, after the robot's hh:12 run has committed fresh bars: manage open trades
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
+      try { await deadman(env); } catch (e) { /* never let the watchdog break trade management */ }
       const st = await loadDesk(env);
       if (!st || !st.trades.length) return;
       const lines = manage(st, await loadSnapshot(env));

@@ -111,21 +111,63 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
         ltf = {tf: {k: bars.read(DATA / "bars" / tf / f"{k}.csv") for k in FUTURES} for tf in LTF}
         snap = json.loads((DATA / "snapshot.json").read_text()) if (DATA / "snapshot.json").exists() else {}
         dec, imgs = cards.build(now, sc, load_calendar(), h1, h4, health_ok, ltf=ltf, snap=snap)
-        (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
-        print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded")
-        if kv is cfkv.put_bundle:
-            cfkv.put_json("dec:latest", dec)          # the bot reads the newest decisions from KV (2 writes an hour)
         state = load_state()
         seen = state.get("decisions")
+        ch = cards.changes(dec, seen) if seen is not None else []
+        # Edge Lab 7.4: log the robot's own entries and score every open one (data/calls.json)
+        from whs import calls as callsmod
+        cpath = DATA / "calls.json"
+        try:
+            allc = json.loads(cpath.read_text()) if cpath.exists() else []
+        except Exception:
+            allc = []
+        if alerts:
+            callsmod.new_calls(ch, dec, allc)
+        series = {(k, "4h"): h4[k] for k in h4} | {(k, "1h"): h1[k] for k in h1} | \
+                 {(k, tf): ltf[tf][k] for tf in ltf for k in ltf[tf]}
+        closed = callsmod.score(allc, series)
+        dec["_calls"] = callsmod.report(allc, now)
+        if alerts:
+            cpath.write_text(json.dumps(allc, indent=0, default=str))
+        (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
+        print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded · calls {len(allc)} ({len(closed)} closed now)")
+        if kv is cfkv.put_bundle:
+            cfkv.put_json("dec:latest", dec)          # the bot reads the newest decisions from KV (2 writes an hour)
         if alerts and seen is not None and is_open(now):
-            for k, old, new in cards.changes(dec, seen)[:4]:
+            for k, old, new in ch[:4]:
                 key, tf = k.split()
                 cap = f"🔔 <b>{k} · {old} → {new}</b>\n" + dec[k]["caption"]
                 if imgs.get(f"card:{key}:{tf}"):
                     send_photo(imgs[f"card:{key}:{tf}"], cap[:1024])
+            # 👀 watch zones: price arrives at the edge of a waiting 4h / 1h range (once per edge)
+            was = state.get("watch") or {}
+            sent = 0 if "watch" in state else 99           # the first run only records the zones (no burst of alerts)
+            for k, d in dec.items():
+                w = d.get("watch") if not k.startswith("_") and not k.endswith("m") else None
+                tag = f"{w['edge']}@{w['level']:.6g}" if w else None
+                if w and was.get(k) != tag and sent < 3 and imgs.get("card:" + k.replace(" ", ":")):
+                    send_photo(imgs["card:" + k.replace(" ", ":")], cards.watch_text(k, w)[:1024])
+                    sent += 1
+            for c in closed:
+                txt = (f"📗 <b>Robot call closed · {c['key']} {c['tf']} {c['action']}</b> → {c['r']:+.2f}R "
+                       f"(best {c['best']:+.1f}R, {c['held']} bars)")
+                try:
+                    telegram.send(txt, html=True)
+                except TypeError:
+                    telegram.send(txt)
         if alerts:
             state["decisions"] = {k: d["action"] if not k.endswith("m") or not d.get("strong") else d["action"] + " ✅"
                                   for k, d in dec.items() if not k.startswith("_")}
+            state["watch"] = {k: f"{d['watch']['edge']}@{d['watch']['level']:.6g}" for k, d in dec.items()
+                              if not k.startswith("_") and not k.endswith("m") and d.get("watch")}
+            local = pd.Timestamp(now).tz_convert(LOCAL_TZ)          # Saturday morning: the weekly self-grade
+            wk = local.strftime("%G-%V")
+            if local.weekday() == 5 and local.hour >= 8 and state.get("last_grade_week") != wk:
+                try:
+                    telegram.send(dec["_calls"], html=True)
+                except TypeError:
+                    telegram.send(dec["_calls"])
+                state["last_grade_week"] = wk
             STATE.write_text(json.dumps(state, indent=1))
         return dec, imgs
     except Exception as e:   # cards must never break data collection
