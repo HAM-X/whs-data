@@ -131,8 +131,6 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
             cpath.write_text(json.dumps(allc, indent=0, default=str))
         (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
         print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded · calls {len(allc)} ({len(closed)} closed now)")
-        if kv is cfkv.put_bundle:
-            cfkv.put_json("dec:latest", dec)          # the bot reads the newest decisions from KV (2 writes an hour)
         if alerts and seen is not None and is_open(now):
             for k, old, new in ch[:4]:
                 key, tf = k.split()
@@ -155,6 +153,26 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
                     telegram.send(txt, html=True)
                 except TypeError:
                     telegram.send(txt)
+        # the HOURLY UPDATE: board (4 timeframes) + overview caption, then one block per pair. Silent, except the first
+        # one of the day from 08:00 (it replaces the morning brief). /hourly off in the bot stops it.
+        cap, body = cards.hourly_texts(dec, ch, news.grouped(news.upcoming(load_calendar(), now, 24)), pd.Timestamp(now).tz_convert("UTC"))
+        dec["_hourly"] = {"caption": cap, "body": body}
+        (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
+        if kv is cfkv.put_bundle:
+            cfkv.put_json("dec:latest", dec)
+        if alerts and is_open(now) and imgs.get("board") and (cfkv.get_text("hourly") or "on") != "off":
+            local = pd.Timestamp(now).tz_convert(LOCAL_TZ)
+            first = local.hour >= 8 and state.get("last_brief_day") != local.strftime("%Y-%m-%d")
+            try:
+                send_photo(imgs["board"], cap, silent=not first)
+            except TypeError:
+                send_photo(imgs["board"], cap)
+            try:
+                telegram.send(body, html=True, silent=not first)
+            except TypeError:
+                telegram.send(body)
+            if first:
+                state["last_brief_day"] = local.strftime("%Y-%m-%d")
         if alerts:
             state["decisions"] = {k: d["action"] if not k.endswith("m") or not d.get("strong") else d["action"] + " ✅"
                                   for k, d in dec.items() if not k.startswith("_")}

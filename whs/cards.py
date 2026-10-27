@@ -124,6 +124,115 @@ def watch_text(k: str, w: dict) -> str:
             f"<i>Prepare: /zoom {key} for the 15m · /zoom {key} 5m · /why {key} {tf}</i>")
 
 
+def _extras(vs: dict, rec: dict) -> dict:
+    sw = vs["swings"][-1] if vs["swings"] else None
+    b = vs["bars"][-1] if vs["bars"] else None
+    return dict(major=(rec.get("major") or {}).get("state"),
+                sw=dict(dir=sw["dir"], code=sw["code"], v=sw["v"], r=sw["r"], text=sw["text"], pct=sw["pct"]) if sw else None,
+                lb=dict(expr=b["expr"], code=b["code"], text=b["text"]) if b else None)
+
+
+UPS = {"TREND ↑", "BUY ZONE", "BUY PULLBACKS"}
+DNS = {"TREND ↓", "SELL ZONE", "SELL RALLIES"}
+
+
+def direction(dec: dict, key: str) -> tuple[int, str]:
+    """+1 / −1 / 0 and a label from the four timeframes (actions first, the major swing when the action is neutral)."""
+    up = dn = 0
+    for tf, w in (("4h", 2), ("1h", 1.5), ("15m", 1), ("5m", 0.5)):
+        d = dec.get(f"{key} {tf}")
+        if not d:
+            continue
+        a, m = d["action"], d.get("major")
+        if a in UPS or (a not in DNS and m == 1):
+            up += w
+        elif a in DNS or (a not in UPS and m == -1):
+            dn += w
+    n_up = sum(1 for tf in ("4h", "1h", "15m", "5m") if (dec.get(f"{key} {tf}") or {}).get("action") in UPS or
+               ((dec.get(f"{key} {tf}") or {}).get("action") not in DNS and (dec.get(f"{key} {tf}") or {}).get("major") == 1))
+    n_dn = sum(1 for tf in ("4h", "1h", "15m", "5m") if (dec.get(f"{key} {tf}") or {}).get("action") in DNS or
+               ((dec.get(f"{key} {tf}") or {}).get("action") not in UPS and (dec.get(f"{key} {tf}") or {}).get("major") == -1))
+    if up - dn >= 2:
+        return 1, f"▲ UP {n_up}/4"
+    if dn - up >= 2:
+        return -1, f"▼ DOWN {n_dn}/4"
+    return 0, f"◆ MIXED {n_up}↑ {n_dn}↓"
+
+
+SHORT_ACT = {"BUY ZONE": "BUY ZONE", "SELL ZONE": "SELL ZONE", "BUY PULLBACKS": "BUY PB", "SELL RALLIES": "SELL RALLY",
+             "WATCH": "WATCH", "WAIT": "WAIT", "TREND ↑": "TREND ↑", "TREND ↓": "TREND ↓", "SIDEWAYS": "SIDEWAYS",
+             "NO NEW ENTRIES": "NEWS"}
+
+
+def do_line(d4: dict, d1: dict, d15: dict, d5: dict) -> str:
+    """One instruction per pair: the highest timeframe that has something to do decides."""
+    for tf, d in (("15m", d15), ("5m", d5)):
+        if d.get("strong"):
+            return f"{tf} {d['action']} at the HTF edge — {d['trigger']}"
+    for tf, d in (("4h", d4), ("1h", d1)):
+        a = d.get("action")
+        if a in BULL | BEAR:
+            return f"{tf} {a} — {d['trigger']} · invalid {d.get('invalid', '—')}"
+        if a == "WATCH":
+            return f"{tf} WATCH — be at the chart: {d['trigger']}"
+        if a == "NO NEW ENTRIES":
+            return f"no new entries — {d['do']}"
+    for tf, d in (("4h", d4), ("1h", d1)):
+        if d.get("action") == "WAIT" and d.get("levels"):
+            S, R = d["levels"]
+            return f"wait ({tf} phase {d.get('short', '')[6:7] or '?'}) — long only on a spring below {_p(S)} · short on a UTAD above {_p(R)}"
+    a4 = d4.get("action")
+    if a4 in ("TREND ↑", "TREND ↓"):
+        return f"4h {a4} — nothing at a level; {d4.get('invalid', '')}"
+    return d4.get("do", "—")
+
+
+def hourly_texts(dec: dict, changes: list, up: list, now) -> tuple[str, str]:
+    """(caption for the board photo ≤ 1024, detail text ≤ 4000): the hourly update."""
+    keys = [k for k in ("6E", "6B", "6A", "6N", "6J", "6C", "6S", "GC") if f"{k} 4h" in dec]
+    loc = now.tz_convert(LOCAL)
+    act = [(k, d) for k, d in dec.items() if not k.startswith("_") and d["action"] in BULL | BEAR and (not k.endswith("m") or d.get("aligned"))]
+    edge = [k for k in keys if any((dec.get(f"{k} {tf}") or {}).get("nest", {}).get("side") for tf in ("15m", "5m"))]
+    soon = [e for e in up if pd.Timestamp(e["t"]) <= now + pd.Timedelta(hours=2)]
+    dl = (dec.get("_dollar") or "").split("\n")[0].replace("<b>", "").replace("</b>", "").replace("Dollar  ▸ ", "")
+    cap = [f"<b>Hourly · {loc.strftime('%a %H:%M')}</b>  {_esc(dl)}"]
+    cap.append("<b>Act</b>  " + (" · ".join(f"{k} {_esc(d['action'])}" for k, d in act[:4]) if act else "nothing confirmed"))
+    if edge:
+        cap.append("<b>At a 4h/1h edge</b>  " + " · ".join(edge))
+    if changes:
+        cap.append("<b>Changed</b>  " + " · ".join(f"{k} {_esc(o)}→{_esc(n)}" for k, o, n in changes[:5]))
+    cap.append("<b>News ≤2h</b>  " + (" · ".join(f"{e['ccy']} {_esc(e['title'][:24])} {_loc(e['t'], '%H:%M')}" for e in soon[:3])
+                                       if soon else "none"))
+    body = []
+    for k in keys:
+        d4, d1, d15, d5 = (dec.get(f"{k} {tf}") or {} for tf in ("4h", "1h", "15m", "5m"))
+        _, lab = direction(dec, k)
+        rng = f" {_p(d4['levels'][0])}–{_p(d4['levels'][1])}" if d4.get("levels") else ""
+        lines = [f"<b>{k}</b>  {lab}  ·  4h {_esc(d4.get('action', '—'))}{_esc(rng)} · 1h {_esc(d1.get('action', '—'))} · "
+                 f"15m {_esc(d15.get('action', '—'))} · 5m {_esc(d5.get('action', '—'))}"]
+        sws = []
+        for tf, d in (("4h", d4), ("1h", d1)):
+            sw = d.get("sw")
+            if sw:
+                sws.append(f"{tf} {'▲' if sw['dir'] == 1 else '▼'} V{sw['v']} R{sw['r']} → {sw['code']} {sw['text']}")
+        if sws:
+            lines.append("   swing  " + _esc(" · ".join(sws)))
+        bs = []
+        for tf, d in (("1h", d1), ("5m", d5)):
+            lb = d.get("lb")
+            if lb:
+                bs.append(f"{tf} {lb['expr'].split(' close')[0]} → {lb['code']} {lb['text']}")
+        if bs:
+            lines.append("   bar  " + _esc(" · ".join(bs)))
+        ns = d15.get("nest") or {}
+        if ns.get("side"):
+            lines.append("   edge  " + _esc(ns["line"]) + (" ◐" if d15.get("aligned") or d5.get("aligned") else ""))
+        lines.append("   <b>do</b>  " + _esc(do_line(d4, d1, d15, d5)))
+        body.append("\n".join(lines))
+    text = "\n\n".join(body) + "\n\n<i>/chart · /zoom · /vsa · /why any pair · /hourly off to stop these</i>"
+    return "\n".join(cap)[:1024], text[:4000]
+
+
 def why_text(key: str, tf: str, rec: dict, dec: dict) -> str:
     g = (rec.get("ranges") or [None])[-1]
     out = [f"<b>{key} · {tf} · the Wyckoff story</b>  ▸ <b>{_esc(dec['action'])}</b>", ""]
@@ -184,7 +293,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
             dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
                                           caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs),
                                           why=why_text(key, tf, rec, dec), price=float(c[-1]),
-                                          bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]))
+                                          bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]), **_extras(vs, rec))
             dec_all[f"{key} {tf}"]["watch"] = watch(float(c[-1]), dec_all[f"{key} {tf}"]["atr"], dec_all[f"{key} {tf}"])
             row["d4" if tf == "4h" else "d1"] = dec
             if tf == "4h":
@@ -234,12 +343,18 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
                     print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
                 dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
                                               caption=cap, vsa=vsa_text(key, tf, t, vs), why=why_text(key, tf, rec, dec),
-                                              nest=ns, aligned=bool(aligned), strong=bool(strong), price=float(c[-1]))
+                                              nest=ns, aligned=bool(aligned), strong=bool(strong), price=float(c[-1]),
+                                              bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]), **_extras(vs, rec))
             except Exception as e:
                 print(f"[ltf read error] {key} {tf}: {type(e).__name__}: {e}")
     png = os.path.join(outdir, "board.png")
     try:
-        render.board(board_rows, now.tz_convert(LOCAL).strftime("%a %d %b %H:%M") + " UTC+3", png)
+        rows4 = []
+        for row in board_rows:
+            k = row["key"]
+            rows4.append(dict(row, tfs=[(tf, dec_all.get(f"{k} {tf}")) for tf in ("4h", "1h", "15m", "5m")],
+                              dirn=direction(dec_all, k)))
+        render.board(rows4, now.tz_convert(LOCAL).strftime("%a %d %b %H:%M") + " UTC+3", png)
         images["board"] = png
     except Exception as e:
         print(f"[board error] {type(e).__name__}: {e}")

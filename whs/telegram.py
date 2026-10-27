@@ -9,13 +9,15 @@ import urllib.request
 from .config import BOT_NAME
 
 
-def send(text: str, html: bool = False) -> bool:
+def send(text: str, html: bool = False, silent: bool = False) -> bool:
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     msg = f"{BOT_NAME} · {text}"
     if not token or not chat:
         print("[telegram skipped: no secrets]\n" + msg)
         return False
     fields = {"chat_id": chat, "text": msg[:4000], "disable_web_page_preview": "true"}
+    if silent:
+        fields["disable_notification"] = "true"
     if html:
         fields["parse_mode"] = "HTML"
     data = urllib.parse.urlencode(fields).encode()
@@ -29,7 +31,7 @@ def send(text: str, html: bool = False) -> bool:
     return ok
 
 
-def send_photo(path: str, caption: str = "", html: bool = True) -> bool:
+def send_photo(path: str, caption: str = "", html: bool = True, silent: bool = False) -> bool:
     """A picture with a caption (≤ 1024 characters) through Pipdon BOT. Multipart upload, no extra packages."""
     token, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
@@ -37,7 +39,8 @@ def send_photo(path: str, caption: str = "", html: bool = True) -> bool:
         return False
     import uuid
     b = uuid.uuid4().hex
-    parts = [("chat_id", chat), ("caption", caption[:1024])] + ([("parse_mode", "HTML")] if html else [])
+    parts = [("chat_id", chat), ("caption", caption[:1024])] + ([("parse_mode", "HTML")] if html else []) + \
+            ([("disable_notification", "true")] if silent else [])
     body = b"".join(f"--{b}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode() for k, v in parts)
     with open(path, "rb") as f:
         body += (f"--{b}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"card.png\"\r\n"

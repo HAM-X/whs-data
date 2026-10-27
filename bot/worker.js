@@ -47,6 +47,7 @@ export function help() {
     "",
     "<b>Read the market</b>",
     "/today — the board: every chart's action + what to act on, watch and avoid",
+    "/hourly — the latest hourly update: every pair × 4h 1h 15m 5m, direction, swing + bar, what to do (/hourly off · on)",
     "/refresh — a fresh read of every chart now (≈2 min) · /refresh 6E 15m for one chart",
     "/setups — what to act on now, and which charts sit at a 4h / 1h edge",
     "/chart 6E [1h] — the chart card: action, trigger, levels, who's in control",
@@ -357,6 +358,9 @@ export function route(text, snap, env = {}, sc = null) {
       return "This one is read fresh from the market — the bot needs its GitHub token for that (see /refresh).";
     case "/setups": case "/hitlist": return textOf(dec, "_setups", "No setups list yet — the robot writes it every hour.");
     case "/dollar": case "/usd": case "/dx": return textOf(dec, "_dollar", "No dollar read yet.");
+    case "/hourly": case "/update": case "/overview":
+      return dec && dec._hourly ? { photo: "board", caption: dec._hourly.caption, then: dec._hourly.body }
+                                : "No hourly update yet — the robot writes one every hour.";
     case "/calls": case "/grade": return textOf(dec, "_calls", "No self-grade yet — the robot scores its calls every hour.");
     case "/health": return health(snap);
     case "/news": return sc && sc.__news ? sc.__news : "No calendar yet — the robot fetches it every hour.";
@@ -374,6 +378,8 @@ export function route(text, snap, env = {}, sc = null) {
   if (k && /\b(why|story|wyckoff)\b/.test(t)) return whyReply(dec, k, tfw);
   if (k && /\b(zoom|ltf|15m|5m|lower|entry)\b/.test(t)) return zoomReply(dec, k, tfw.endsWith("m") ? tfw : "15m");
   if (/\b(setups?|hit ?list|opportunit\w*)\b/.test(t)) return textOf(dec, "_setups", "No setups list yet.");
+  if (!k && /\b(hourly|overview|update|all pairs|everything)\b/.test(t))
+    return dec && dec._hourly ? { photo: "board", caption: dec._hourly.caption, then: dec._hourly.body } : "No hourly update yet.";
   if (/\b(calls|self.?grade|track record|how (is|has) the robot)\b/.test(t)) return textOf(dec, "_calls", "No self-grade yet.");
   if (/\b(dollar|usd|dxy)\b/.test(t) && (!k || k === "DX")) return textOf(dec, "_dollar", "No dollar read yet.");
   if (/\b(health|feed|data|robot|working|broken)\b/.test(t) && !k) return health(snap);
@@ -516,7 +522,11 @@ async function replyPhoto(env, chatId, name, caption) {
 }
 
 async function answer(env, chatId, out) {
-  if (out && typeof out === "object" && out.photo) return replyPhoto(env, chatId, out.photo, out.caption);
+  if (out && typeof out === "object" && out.photo) {
+    await replyPhoto(env, chatId, out.photo, out.caption);
+    if (out.then) await reply(env, chatId, out.then);
+    return;
+  }
   return reply(env, chatId, String(out));
 }
 
@@ -571,6 +581,13 @@ export default {
     let text;
     const [c0, ...a0] = msg.text.trim().split(/\s+/);
     const dcmd = c0.toLowerCase().replace(/@.*$/, "");
+    if (dcmd === "/hourly" && /^(on|off)$/i.test(a0[0] || "")) {
+      if (!env.DESK) { await reply(env, msg.chat.id, "Storage isn't set up yet."); return new Response("ok"); }
+      if (/^off$/i.test(a0[0])) await env.DESK.put("hourly", "off"); else await env.DESK.delete("hourly");
+      await reply(env, msg.chat.id, /^off$/i.test(a0[0]) ? "🔕 Hourly updates off. /hourly on to restart · /hourly shows the latest one."
+                                                        : "🔔 Hourly updates on — the next one comes at the robot's next run (hh:12).");
+      return new Response("ok");
+    }
     if (dcmd === "/refresh" || /^(refresh|update now|fresh read)\b/i.test(msg.text.trim())) {
       await reply(env, msg.chat.id, await refresh(env, a0));
       return new Response("ok");

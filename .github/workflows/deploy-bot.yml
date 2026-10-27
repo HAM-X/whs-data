@@ -103,6 +103,7 @@ jobs:
             --data-urlencode 'allowed_updates=["message","edited_message"]' --data-urlencode "drop_pending_updates=true")
           echo "$RESP" | grep -q '"ok":true' || { echo "::error::setWebhook failed: $RESP"; exit 1; }
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/setMyCommands" -H 'content-type: application/json' -d '{"commands":[
+            {"command":"hourly","description":"Latest hourly update: all pairs, all timeframes, swing and bar (on or off)"},
             {"command":"today","description":"The board: every chart action and what to act on"},
             {"command":"refresh","description":"Fresh read of every chart now (about 2 min)"},
             {"command":"setups","description":"Act now + charts at a 4h or 1h edge"},

@@ -166,3 +166,10 @@ test("dead-man switch: down once, then back; quiet when the market is closed", a
   assert.equal(deadmanCheck("2026-10-30T20:12:00Z", null, Date.parse("2026-10-31T12:00:00Z")), "ok");
   assert.equal(deadmanCheck("2026-11-01T10:00:00Z", null, Date.parse("2026-11-01T23:30:00Z")), "ok");   // just after the Sunday open
 });
+
+
+test("/hourly shows the board + the per-pair detail", () => {
+  const d = { ...dec, _hourly: { caption: "<b>Hourly</b>", body: "<b>6E</b> ▼ DOWN" } };
+  assert.deepEqual(route("/hourly", snap, {}, { __dec: d }), { photo: "board", caption: "<b>Hourly</b>", then: "<b>6E</b> ▼ DOWN" });
+  assert.equal(route("overview of all pairs", snap, {}, { __dec: d }).then, "<b>6E</b> ▼ DOWN");
+});

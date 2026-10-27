@@ -165,30 +165,50 @@ def chart_card(key: str, tf: str, d: pd.DataFrame, eff: np.ndarray, rec: dict, d
     return out
 
 
+SHORT = {"BUY ZONE": "BUY ZONE", "SELL ZONE": "SELL ZONE", "BUY PULLBACKS": "BUY PB", "SELL RALLIES": "SELL RALLY",
+         "WATCH": "WATCH", "WAIT": "WAIT", "TREND ↑": "TREND ↑", "TREND ↓": "TREND ↓", "SIDEWAYS": "SIDEWAYS",
+         "NO NEW ENTRIES": "NEWS"}
+
+
 def board(rows: list[dict], when: str, out: str = "board.png") -> str:
-    """The market board: one row per future — 4h and 1h action chips, who is in control, the level that matters."""
-    fig = plt.figure(figsize=(10.8, 2.2 + 1.05 * len(rows)), dpi=100, facecolor=BG)
+    """The market board: one row per future — direction, an action chip per timeframe (4h · 1h · 15m · 5m), control."""
+    fig = plt.figure(figsize=(10.8, 2.3 + 1.1 * len(rows)), dpi=100, facecolor=BG)
     H = fig.get_figheight()
-    fig.text(0.05, 1 - 0.55 / H, "Market board", fontsize=34, fontweight="bold", color=INK, va="center")
+    fig.text(0.05, 1 - 0.55 / H, "Market board", fontsize=32, fontweight="bold", color=INK, va="center")
     fig.text(0.95, 1 - 0.55 / H, when, fontsize=15, color=QUIET, va="center", ha="right")
-    hy = 1 - 1.35 / H
-    for x, lab in ((0.05, ""), (0.2, "4h"), (0.48, "1h"), (0.74, "who's in control (4h)")):
+    cols = [("", 0.05), ("direction", 0.165), ("4h", 0.31), ("1h", 0.44), ("15m", 0.57), ("5m", 0.70)]
+    hy = 1 - 1.4 / H
+    for lab, x in cols:
         fig.text(x, hy, lab, fontsize=13, color=QUIET, fontweight="bold", va="center")
+    fig.text(0.95, hy, "control 4h", fontsize=13, color=QUIET, fontweight="bold", va="center", ha="right")
+    fig.text(0.95, 0.012, "control: R = last rally · X = last reaction (VSA code)", fontsize=10, color=QUIET, ha="right")
     for k, r in enumerate(rows):
-        y = 1 - (1.95 + 1.05 * k) / H
-        fig.patches.append(FancyBboxPatch((0.035, y - 0.42 / H), 0.93, 0.84 / H, boxstyle="round,pad=0,rounding_size=0.01",
+        y = 1 - (2.05 + 1.1 * k) / H
+        fig.patches.append(FancyBboxPatch((0.035, y - 0.44 / H), 0.93, 0.88 / H, boxstyle="round,pad=0,rounding_size=0.01",
                                           transform=fig.transFigure, fc=PANEL, ec="none"))
         fig.text(0.05, y + 0.12 / H, r["key"], fontsize=24, fontweight="bold", color=INK, va="center")
-        fig.text(0.05, y - 0.22 / H, NAMES.get(r["key"], ""), fontsize=11, color=QUIET, va="center")
-        for x, dk in ((0.2, "d4"), (0.48, "d1")):
-            dd = r[dk]
-            fig.text(x, y + 0.12 / H, dd["action"], fontsize=15, fontweight="bold", color="white", va="center",
-                     bbox=dict(boxstyle="round,pad=0.35,rounding_size=0.5", fc=COLORS.get(dd["tone"], INK), ec="none"))
-            fig.text(x, y - 0.25 / H, dd.get("short", ""), fontsize=11, color=QUIET, va="center")
-        ctrl = r["ctrl"]
+        fig.text(0.05, y - 0.24 / H, {"6N": "NZ dollar", "6A": "Aussie dollar", "6C": "Canadian $", "6B": "British pound"}.get(
+            r["key"], NAMES.get(r["key"], "")), fontsize=10.5, color=QUIET, va="center")
+        dv, dl = r.get("dirn", (0, "◆"))
+        fig.text(0.165, y + 0.12 / H, dl.split(" ")[0] + " " + dl.split(" ")[1], fontsize=15, fontweight="bold",
+                 color=UP if dv == 1 else DN if dv == -1 else QUIET, va="center")
+        fig.text(0.165, y - 0.24 / H, " ".join(dl.split(" ")[2:]), fontsize=11, color=QUIET, va="center")
+        for (tf, d), (_, x) in zip(r.get("tfs", []), cols[2:]):
+            if not d:
+                fig.text(x, y + 0.12 / H, "—", fontsize=14, color=QUIET, va="center")
+                continue
+            tone = COLORS.get(d["tone"], INK)
+            fig.text(x, y + 0.12 / H, SHORT.get(d["action"], d["action"]), fontsize=11.5, fontweight="bold", color="white",
+                     va="center", bbox=dict(boxstyle="round,pad=0.32,rounding_size=0.5", fc=tone, ec="none"))
+            sub = d.get("short", "")
+            sub = sub.split(" · ")[0] if sub.startswith("phase") else ("at edge ◐" if d.get("aligned") else "")
+            if sub:
+                fig.text(x, y - 0.26 / H, sub, fontsize=10, color=QUIET, va="center")
+        ctrl = r.get("ctrl", "")
         col = UP if ctrl.startswith("DEMAND") else DN if ctrl.startswith("SUPPLY") else QUIET
-        fig.text(0.74, y + 0.12 / H, ctrl.split(" ")[0], fontsize=16, fontweight="bold", color=col, va="center")
-        fig.text(0.74, y - 0.25 / H, r.get("ctrl_why", ""), fontsize=11, color=QUIET, va="center")
+        fig.text(0.95, y + 0.12 / H, ctrl.split(" ")[0], fontsize=14, fontweight="bold", color=col, va="center", ha="right")
+        fig.text(0.95, y - 0.24 / H, r.get("ctrl_why", "").replace("rally ", "R ").replace("reaction ", "X "), fontsize=10,
+                 color=QUIET, va="center", ha="right")
     fig.savefig(out, dpi=100, facecolor=BG)
     plt.close(fig)
     return out

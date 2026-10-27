@@ -81,3 +81,17 @@ def put_json(key: str, obj) -> bool:
     except Exception as e:
         print(f"[kv error] {key}: {type(e).__name__}: {e}")
         return False
+
+
+def get_text(key: str) -> str | None:
+    """A small KV value the bot sets (e.g. 'hourly' = 'off'). None without secrets or when missing."""
+    ns = namespace()
+    if not ns:
+        return None
+    try:
+        h = {"Authorization": f"Bearer {os.environ['CLOUDFLARE_API_TOKEN']}"}
+        url = API.format(acc=os.environ["CLOUDFLARE_ACCOUNT_ID"]) + f"/{ns}/values/{key}"
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20) as r:
+            return r.read().decode()
+    except Exception:
+        return None
