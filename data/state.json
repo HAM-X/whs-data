@@ -36,7 +36,7 @@
   "6S 5m": "WAIT",
   "GC 4h": "TREND \u2193",
   "GC 1h": "SIDEWAYS",
-  "GC 15m": "TREND \u2193",
+  "GC 15m": "SIDEWAYS",
   "GC 5m": "WAIT"
  }
 }
