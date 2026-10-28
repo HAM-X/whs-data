@@ -13,17 +13,18 @@
   "GBP|Annual Budget Release|2026-10-28T12:30:00+00:00",
   "CAD|BOC Monetary Policy Report|2026-10-28T13:45:00+00:00",
   "CAD|BOC Rate Statement|2026-10-28T13:45:00+00:00",
-  "CAD|Overnight Rate|2026-10-28T13:45:00+00:00"
+  "CAD|Overnight Rate|2026-10-28T13:45:00+00:00",
+  "CAD|BOC Press Conference|2026-10-28T14:30:00+00:00"
  ],
  "decisions": {
   "6E 4h": "WAIT",
   "6E 1h": "WAIT",
   "6E 15m": "TREND \u2191",
   "6E 5m": "TREND \u2191",
-  "6B 4h": "NO NEW ENTRIES",
-  "6B 1h": "NO NEW ENTRIES",
-  "6B 15m": "NO NEW ENTRIES",
-  "6B 5m": "NO NEW ENTRIES",
+  "6B 4h": "TREND \u2191",
+  "6B 1h": "WAIT",
+  "6B 15m": "WAIT",
+  "6B 5m": "WAIT",
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "WAIT",
@@ -31,11 +32,11 @@
   "6N 4h": "TREND \u2193",
   "6N 1h": "TREND \u2193",
   "6N 15m": "TREND \u2193",
-  "6N 5m": "TREND \u2193",
+  "6N 5m": "TREND \u2191",
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2193",
   "6J 15m": "BUY PULLBACKS \u2705",
-  "6J 5m": "WAIT",
+  "6J 5m": "TREND \u2193",
   "6C 4h": "NO NEW ENTRIES",
   "6C 1h": "NO NEW ENTRIES",
   "6C 15m": "NO NEW ENTRIES",
@@ -49,5 +50,7 @@
   "GC 15m": "WAIT",
   "GC 5m": "WAIT"
  },
- "watch": {}
+ "watch": {
+  "6A 1h": "resistance@0.703"
+ }
 }
