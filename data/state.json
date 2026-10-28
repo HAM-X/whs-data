@@ -14,11 +14,11 @@
  "decisions": {
   "6E 4h": "WAIT",
   "6E 1h": "WAIT",
-  "6E 15m": "TREND \u2191",
-  "6E 5m": "TREND \u2191",
+  "6E 15m": "WAIT",
+  "6E 5m": "WAIT",
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
-  "6B 15m": "TREND \u2193",
+  "6B 15m": "WAIT",
   "6B 5m": "WAIT",
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
@@ -45,7 +45,5 @@
   "GC 15m": "WAIT",
   "GC 5m": "WAIT"
  },
- "watch": {
-  "6E 4h": "support@1.11415"
- }
+ "watch": {}
 }
