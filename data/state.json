@@ -14,8 +14,8 @@
  "decisions": {
   "6E 4h": "WAIT",
   "6E 1h": "WAIT",
-  "6E 15m": "TREND \u2193",
-  "6E 5m": "TREND \u2193",
+  "6E 15m": "TREND \u2191",
+  "6E 5m": "TREND \u2191",
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
   "6B 15m": "TREND \u2193",
@@ -31,7 +31,7 @@
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2193",
   "6J 15m": "BUY PULLBACKS \u2705",
-  "6J 5m": "WAIT",
+  "6J 5m": "TREND \u2191",
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
   "6C 15m": "TREND \u2193",
@@ -46,7 +46,6 @@
   "GC 5m": "WAIT"
  },
  "watch": {
-  "6E 4h": "support@1.11415",
-  "6A 1h": "resistance@0.703"
+  "6E 4h": "support@1.11415"
  }
 }
