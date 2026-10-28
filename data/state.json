@@ -20,10 +20,10 @@
   "6B 1h": "WAIT",
   "6B 15m": "WAIT",
   "6B 5m": "WAIT",
-  "6A 4h": "NO NEW ENTRIES",
-  "6A 1h": "NO NEW ENTRIES",
-  "6A 15m": "NO NEW ENTRIES",
-  "6A 5m": "NO NEW ENTRIES",
+  "6A 4h": "SIDEWAYS",
+  "6A 1h": "WAIT",
+  "6A 15m": "WAIT",
+  "6A 5m": "WAIT",
   "6N 4h": "NO NEW ENTRIES",
   "6N 1h": "NO NEW ENTRIES",
   "6N 15m": "NO NEW ENTRIES",
@@ -34,18 +34,19 @@
   "6J 5m": "TREND \u2191",
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
-  "6C 15m": "WAIT",
+  "6C 15m": "TREND \u2193",
   "6C 5m": "WAIT",
   "6S 4h": "TREND \u2193",
   "6S 1h": "TREND \u2193",
   "6S 15m": "TREND \u2193",
-  "6S 5m": "SIDEWAYS",
+  "6S 5m": "TREND \u2193",
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2191",
   "GC 15m": "TREND \u2191",
-  "GC 5m": "TREND \u2191"
+  "GC 5m": "TREND \u2193"
  },
  "watch": {
-  "6E 4h": "support@1.11415"
+  "6E 4h": "support@1.11415",
+  "6A 1h": "resistance@0.703"
  }
 }
