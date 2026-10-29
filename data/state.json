@@ -53,5 +53,7 @@
   "GC 15m": "WAIT",
   "GC 5m": "WAIT"
  },
- "watch": {}
+ "watch": {
+  "6A 1h": "resistance@0.703"
+ }
 }
