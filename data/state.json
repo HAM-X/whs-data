@@ -36,7 +36,7 @@
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "WAIT",
-  "6A 5m": "WAIT",
+  "6A 5m": "WATCH",
   "6N 4h": "TREND \u2193",
   "6N 1h": "TREND \u2193",
   "6N 15m": "WAIT",
@@ -58,5 +58,7 @@
   "GC 15m": "SELL RALLIES",
   "GC 5m": "WATCH"
  },
- "watch": {}
+ "watch": {
+  "6A 1h": "resistance@0.703"
+ }
 }
