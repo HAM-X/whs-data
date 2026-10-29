@@ -23,6 +23,8 @@ from . import core, decide, news, render, scan as scanmod, swings, vsa
 from .config import FUTURES
 
 LOCAL = "Africa/Nairobi"
+SIGNAL_ALERTS = False   # Hamza 29 Oct: "I don't want your signals, I want the fact as it comes and confirms itself" —
+                        # no 🔔 for phase-C setups; they stay on the cards / board and are still logged as calls
 ACTIONABLE = {"BUY ZONE", "SELL ZONE"}   # heal: only phase-C entries alert (phase D / WATCH: no edge in the replay)
 
 

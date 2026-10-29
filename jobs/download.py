@@ -132,7 +132,7 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
         (DATA / "decisions.json").write_text(json.dumps(dec, separators=(",", ":"), default=str))
         print(f"[cards] {len(imgs)} images, {kv(imgs)} uploaded · calls {len(allc)} ({len(closed)} closed now)")
         if alerts and seen is not None and is_open(now):
-            for k, old, new in ch[:4]:
+            for k, old, new in (ch[:4] if cards.SIGNAL_ALERTS else []):
                 key, tf = k.split()
                 cap = f"🔔 <b>{k} · {old} → {new}</b>\n" + dec[k]["caption"]
                 if imgs.get(f"card:{key}:{tf}"):
