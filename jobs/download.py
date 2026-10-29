@@ -122,7 +122,7 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
         except Exception:
             allc = []
         if alerts:
-            callsmod.new_calls(ch, dec, allc)
+            callsmod.new_calls(callsmod.entries(dec), dec, allc)
         series = {(k, "4h"): h4[k] for k in h4} | {(k, "1h"): h1[k] for k in h1} | \
                  {(k, tf): ltf[tf][k] for tf in ltf for k in ltf[tf]}
         closed = callsmod.score(allc, series)

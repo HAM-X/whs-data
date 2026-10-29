@@ -142,14 +142,9 @@ def build(snap: dict, scan: dict, h1: dict, h4: dict) -> dict:
                 if p:
                     pts += p
                     why.append(f"{tf} range phase {g['phase']}")
-        if ccy and ccy in pers:
-            pts += 1.5
-            why.append(f"{ccy} {pers[ccy]}")
-        for side in ("dx_high", "dx_low"):
-            rd = ((ss.get(side) or {}).get("read") or {}).get(ccy) if ccy else None
-            if rd and rd["dir"]:
-                pts += 1.5
-                why.append(f"{ccy} {rd['text'].split(' — ')[0]} vs DX ({'bullish' if rd['dir'] == 1 else 'bearish'})")
+        # Heal fix 6 · currency-strength persistence and the DX sweet spot no longer score the Top 3:
+        # over two years "X strong / weak (all 3 windows)" was right 48.7 % of the time (2,857 calls) and the
+        # Edge Lab found no edge for relative strength (20 Oct 2026). They stay in panel.json as context only.
         if late.get(k):
             pts -= 1
             why.append("ADR ≥ 75 % used — breakouts late")

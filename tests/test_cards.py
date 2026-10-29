@@ -23,11 +23,43 @@ def test_decisions():
         assert decide.chart(r)["short"]
 
 
-def test_alerts_only_on_actionable_changes():
-    dec = {"6E 4h": {"action": "BUY ZONE"}, "6B 4h": {"action": "TREND ↑"}, "6A 4h": {"action": "WAIT"}, "_today": "x"}
-    seen = {"6E 4h": "WAIT", "6B 4h": "WAIT", "6A 4h": "SELL ZONE"}
-    assert cards.changes(dec, seen) == [("6E 4h", "WAIT", "BUY ZONE"), ("6A 4h", "SELL ZONE", "WAIT")]
+def test_dead_setup_is_never_an_entry():
+    """Audit 29 Oct: 6J 15m BUY PULLBACKS was alerted while price sat below its own invalidation."""
+    r = dict(_rec("D", [], 1), close=1.115)                     # SOS done, but price is back below R 1.12
+    d = decide.chart(r)
+    assert d["action"] == "WAIT" and d["failed"] == "BUY PULLBACKS" and "below 1.12" in d["do"]
+    assert "side" not in d and "stop" not in d
+    assert decide.chart(dict(_rec("D", [], 1), close=1.125))["action"] == "BUY PULLBACKS"
+    ev = [["t", "SC", "confirmed", 1.10], ["t", "Spring", "confirmed", 1.098]]
+    assert decide.chart(dict(_rec("C", ev, 1), close=1.097))["action"] == "WAIT"     # closed under the spring low
+    assert decide.chart(dict(_rec("C", [["t", "UTAD", "confirmed", 1.123]], -1), close=1.124))["action"] == "WAIT"
+    assert decide.chart(dict(_rec("D", [], -1), close=1.09))["action"] == "SELL RALLIES"
+
+
+def test_alerts_only_for_fresh_phase_c_setups():
+    dec = {"6E 4h": {"action": "BUY ZONE", "setup": True}, "6N 4h": {"action": "BUY ZONE", "setup": False},
+           "6B 4h": {"action": "TREND ↑"}, "6C 4h": {"action": "BUY PULLBACKS"},
+           "6A 4h": {"action": "WAIT", "failed": "SELL ZONE"}, "6J 4h": {"action": "WAIT"}, "_today": "x"}
+    seen = {"6E 4h": "WAIT", "6N 4h": "WAIT", "6B 4h": "WAIT", "6C 4h": "WAIT", "6A 4h": "SELL ZONE", "6J 4h": "SELL RALLIES"}
+    assert cards.changes(dec, seen) == [("6E 4h", "WAIT", "BUY ZONE"), ("6A 4h", "SELL ZONE", "failed")]
     assert cards.changes(dec, {}) == []
+
+
+def test_entry_window_closes_after_two_bars():
+    ev = [["2026-10-14T15:00:00+00:00", "SC", "confirmed", 1.10], ["2026-10-20T10:00:00+00:00", "Spring", "confirmed", 1.098]]
+    r = dict(_rec("C", ev, 1), close=1.105, last="2026-10-20T12:00:00+00:00")
+    d = decide.chart(r, tf="1h")
+    assert d["action"] == "BUY ZONE" and d["setup"]
+    d = decide.chart(dict(r, last="2026-10-20T14:00:00+00:00"), tf="1h")
+    assert d["action"] == "WAIT" and d["used"] == "BUY ZONE" and "4 bars ago" in d["do"]
+    assert decide.chart(dict(r, last="2026-10-20T14:00:00+00:00"), tf="4h")["setup"]      # 0.5 bar on 4h
+    t = [["2026-10-14T15:00:00+00:00", "SC", "confirmed", 1.10], ["2026-10-20T10:00:00+00:00", "Test", "confirmed", 1.101]]
+    assert not decide.chart(dict(_rec("C", t, 1), close=1.105, last="2026-10-20T11:00:00+00:00"), tf="1h")["setup"]
+
+
+def test_board_flow_replaces_vote():
+    assert cards.direction({"6E 1h": {"flow": 1}}, "6E")[0] == 1
+    assert cards.direction({"6E 1h": {"flow": 0}, "6E 4h": {"action": "TREND ↑", "major": 1}}, "6E") == (0, "◆ NONE no tested read")
 
 
 def test_vsa_symbols_and_bar():
@@ -62,3 +94,25 @@ def test_nested_edges():
     assert cards.nested(1.1195, d4, None)["side"] == -1
     assert cards.nested(1.1100, d4, None)["side"] == 0
     assert cards.nested(1.2000, d4, None)["side"] == 0
+
+
+def test_spring_number_and_phase_d_still_make_the_entry():
+    """Replay 29 Oct: 'Spring #3' (and phase D on the same bar) never became a BUY ZONE — 5 of 127 events did."""
+    ev = [["2026-10-14T15:00:00+00:00", "SC", "confirmed", 1.10], ["2026-10-20T10:00:00+00:00", "Spring #3", "confirmed", 1.098],
+          ["2026-10-20T10:00:00+00:00", "ST", "confirmed", 1.099]]
+    r = dict(_rec("D", ev, 0), close=1.104, last="2026-10-20T11:00:00+00:00")
+    d = decide.chart(r, tf="1h")
+    assert d["action"] == "BUY ZONE" and d["setup"] and d["stop"] == 1.098 and d["side"] == 1
+    assert decide.chart(dict(r, close=1.097), tf="1h")["action"] != "BUY ZONE"          # already below the spring
+    assert decide.chart(dict(r, last="2026-10-20T15:00:00+00:00"), tf="1h")["action"] != "BUY ZONE"   # window closed
+    u = [["2026-10-14T15:00:00+00:00", "BC", "confirmed", 1.13], ["2026-10-20T10:00:00+00:00", "UTAD #3", "confirmed", 1.124]]
+    d = decide.chart(dict(_rec("D", u, 0), close=1.12, last="2026-10-20T10:00:00+00:00"), tf="1h")
+    assert d["action"] == "SELL ZONE" and d["setup"] and d["side"] == -1
+
+
+def test_candidate_spring_is_the_poe1_moment_and_failed_is_not():
+    ev = [["2026-10-14T15:00:00+00:00", "SC", "confirmed", 1.10], ["2026-10-20T10:00:00+00:00", "Spring #3", "candidate", 1.098]]
+    r = dict(_rec("C", ev, 0), close=1.103, last="2026-10-20T10:00:00+00:00")
+    assert decide.chart(r, tf="1h")["action"] == "BUY ZONE"
+    ev[1][2] = "failed"
+    assert decide.chart(dict(r, ranges=[dict(r["ranges"][0], events=ev)]), tf="1h")["action"] != "BUY ZONE"

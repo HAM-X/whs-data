@@ -176,11 +176,11 @@ def board(rows: list[dict], when: str, out: str = "board.png") -> str:
     H = fig.get_figheight()
     fig.text(0.05, 1 - 0.55 / H, "Market board", fontsize=32, fontweight="bold", color=INK, va="center")
     fig.text(0.95, 1 - 0.55 / H, when, fontsize=15, color=QUIET, va="center", ha="right")
-    cols = [("", 0.05), ("direction", 0.165), ("4h", 0.31), ("1h", 0.44), ("15m", 0.57), ("5m", 0.70)]
+    cols = [("", 0.05), ("flow 1h", 0.165), ("4h", 0.31), ("1h", 0.44), ("15m", 0.57), ("5m", 0.70)]
     hy = 1 - 1.4 / H
     for lab, x in cols:
         fig.text(x, hy, lab, fontsize=13, color=QUIET, fontweight="bold", va="center")
-    fig.text(0.95, hy, "control 4h", fontsize=13, color=QUIET, fontweight="bold", va="center", ha="right")
+    fig.text(0.95, hy, "control 4h · context", fontsize=13, color=QUIET, fontweight="bold", va="center", ha="right")
     fig.text(0.95, 0.012, "control: R = last rally · X = last reaction (VSA code)", fontsize=10, color=QUIET, ha="right")
     for k, r in enumerate(rows):
         y = 1 - (2.05 + 1.1 * k) / H

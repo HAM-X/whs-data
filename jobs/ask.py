@@ -82,7 +82,7 @@ def read(key: str, tf: str, d: pd.DataFrame, htf: pd.DataFrame | None, cal: list
     eff = core.effort(v, t, scanmod.TF_MIN[tf])
     led = swings.ledger(o, h, l, c, eff)
     rec = scanmod.read_one(d, tf, htf)
-    dec = decide.chart(rec, news.blackout(cal, key, now) if key != "DX" else None, cards._loc)
+    dec = decide.chart(rec, news.blackout(cal, key, now) if key != "DX" else None, cards._loc, tf)
     vs = vsa.read(o, h, l, c, eff, led, n_swings=6, n_bars=8)
     return dict(d=d, t=t, o=o, h=h, l=l, c=c, eff=eff, led=led, rec=rec, dec=dec, vs=vs)
 
@@ -157,7 +157,7 @@ def answer(text: str, now=None, send_text=telegram.send, send_photo=telegram.sen
     for x, dx in htf_d.items():
         rr = scanmod.read_one(dx, x, None)
         g = (rr.get("ranges") or [None])[-1]
-        dd = decide.chart(rr, None, cards._loc)
+        dd = decide.chart(rr, None, cards._loc, x)
         dd["levels"] = [g["support"], g["resistance"]] if g else None
         htf_dec[x] = dd
     ns = cards.nested(float(r["c"][-1]), htf_dec.get(h_a) if h_a else None, htf_dec.get(h_b) if h_b else None)
