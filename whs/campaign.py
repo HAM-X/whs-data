@@ -287,7 +287,8 @@ def touch_grade(o: float, h: float, l: float, c: float, eff: float, atr: float, 
 def label_text(rd: dict) -> str:
     if rd["grade"] == "resolved":
         return rd["label"]
-    return f"{rd['label']} ({rd['score']:+.0f})" if rd["side"] else f"BALANCED ({rd['score']:+.0f})"
+    sc = float(np.sign(rd["score"]) * np.floor(abs(rd["score"]) + 0.5)) + 0.0   # half away from zero, as Pine prints it
+    return f"{rd['label']} ({sc:+.0f})" if rd["side"] else f"BALANCED ({sc:+.0f})"
 
 
 def where_text(rd: dict, price: float) -> str:
