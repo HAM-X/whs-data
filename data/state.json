@@ -22,12 +22,12 @@
  "decisions": {
   "6E 4h": "WAIT",
   "6E 1h": "WAIT",
-  "6E 15m": "SIDEWAYS",
-  "6E 5m": "TREND \u2191",
+  "6E 15m": "TREND \u2193",
+  "6E 5m": "WATCH",
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
   "6B 15m": "TREND \u2191",
-  "6B 5m": "TREND \u2191",
+  "6B 5m": "WAIT",
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "WAIT",
@@ -38,7 +38,7 @@
   "6N 5m": "TREND \u2193",
   "6J 4h": "WAIT",
   "6J 1h": "SIDEWAYS",
-  "6J 15m": "BUY PULLBACKS \u2705",
+  "6J 15m": "WAIT",
   "6J 5m": "WAIT",
   "6C 4h": "TREND \u2191",
   "6C 1h": "WAIT",
@@ -50,8 +50,8 @@
   "6S 5m": "SIDEWAYS",
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2191",
-  "GC 15m": "TREND \u2191",
-  "GC 5m": "WAIT"
+  "GC 15m": "WATCH",
+  "GC 5m": "TREND \u2193"
  },
  "watch": {
   "6A 1h": "resistance@0.703"
