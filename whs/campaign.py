@@ -206,6 +206,19 @@ def read(rng: dict, price: float, sw: list | None = None, verdict: str = "", maj
         confirm = f"a spring at {S:.5g} or an upthrust at {R:.5g} — the phase-C test decides the read"
         invalid = "—"
         watch = "which edge gets tested on light effort; until then both sides are possible"
+    # where price is now changes what to watch: already through the confirmation level, or testing the far edge
+    if side < 0 and not has("BO", -1):
+        if price < S:
+            confirm = f"price is already below the support {S:.5g} — a close below it on rising effort makes it the SOW (phase D)"
+            watch = "the SOW close, then a weak rally (LPSY) that fails below the old support"
+        elif price > R:
+            watch = "price is above the resistance — this is where an upthrust forms: a close back inside on light effort = UTAD"
+    elif side > 0 and not has("BO", 1):
+        if price > R:
+            confirm = f"price is already above the resistance {R:.5g} — a close above it on rising effort makes it the SOS (phase D)"
+            watch = "the SOS close, then a quiet pullback (LPS / back-up) that holds above the old resistance"
+        elif price < S:
+            watch = "price is below the support — this is where a spring forms: a close back inside on light effort = spring"
     return dict(label=label, side=side, grade=grade, score=round(score, 1), items=items, phase=ph, S=S, R=R,
                 confirm=confirm, invalid=invalid, inv_p=inv_p, watch=watch, chance_up=chance_up(S, R, price))
 

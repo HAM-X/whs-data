@@ -81,3 +81,10 @@ def test_quiet_alerts_announce_a_read_change_only_when_it_holds(tmp_path, monkey
     import json
     log = json.loads((tmp_path / "htr_log.json").read_text())
     assert any(c["kind"] == "campaign" and c["side"] == -1 and c["wick"] for c in log)
+
+
+def test_watch_follows_where_price_is():
+    sw = [dict(d=-1, sp=4150, ep=4000, eff=1.0), dict(d=1, sp=4000, ep=4120, eff=0.8),
+          dict(d=-1, sp=4120, ep=3980, eff=1.2), dict(d=1, sp=3980, ep=4080, eff=0.7)]
+    r = cp.read(rng([ev("ST", "ST", 1, 3960, "2026-10-05", ef=1.5)]), 3900, sw, "SUPPLY in control")
+    assert r["side"] == -1 and "already below the support" in r["confirm"] and "LPSY" in r["watch"]
