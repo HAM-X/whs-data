@@ -23,7 +23,21 @@ from . import core, decide, news, render, scan as scanmod, swings, vsa
 from .config import FUTURES
 
 LOCAL = "Africa/Nairobi"
-ACTIONABLE = {"BUY ZONE", "SELL ZONE", "BUY PULLBACKS", "SELL RALLIES", "WATCH"}
+SIGNAL_ALERTS = False   # Hamza 29 Oct: "I don't want your signals, I want the fact as it comes and confirms itself" —
+                        # no 🔔 for phase-C setups; they stay on the cards / board and are still logged as calls
+ACTIONABLE = {"BUY ZONE", "SELL ZONE"}   # heal: only phase-C entries alert (phase D / WATCH: no edge in the replay)
+
+
+def flow(led, last: int) -> int:
+    """+1 / −1 when the last finished swing is BLUE (ease of movement: more result on less effort than the previous
+    swing of the same side — WTC P-S5 traffic light), else 0. The only direction read that beat a coin out of sample."""
+    sws = [x for x in led.swings if x.confirm_i is not None and x.confirm_i <= last]
+    return int(sws[-1].direction) if sws and sws[-1].tl == swings.TL_BLUE else 0
+
+
+def act_ok(d: dict) -> bool:
+    """An entry worth acting on: a phase-C setup (Spring / Shakeout / UTAD) inside its 2-bar window, not failed (heal fixes 1–3)."""
+    return bool(d.get("setup")) and d.get("action") in ("BUY ZONE", "SELL ZONE")
 
 
 def _loc(iso, fmt="%a %H:%M"):
@@ -98,7 +112,7 @@ WATCH_ATR = 0.3          # an edge is "in play" within 0.3 ATR of it (or up to h
 
 
 def watch(price: float, atr: float, dec: dict) -> dict | None:
-    """Price at the edge of a WAITING range: the place a spring / UTAD — the proven setup — would happen."""
+    """Price at the edge of a WAITING range: the place a spring / UTAD — the course's POE 1 — would happen."""
     if dec.get("action") not in ("WAIT", "WATCH") or not dec.get("levels") or not atr or np.isnan(atr):
         return None
     S, R = dec["levels"]
@@ -116,11 +130,14 @@ def watch_text(k: str, w: dict) -> str:
     key, tf = k.split()
     if w["side"] == 1:
         what = ("below" if w["beyond"] else "at") + f" its support {_p(w['level'])}"
-        nxt = "a spring that closes back above it = BUY ZONE (the proven setup)"
+        nxt = "don't buy the edge. Only a spring that CLOSES back above it is a BUY ZONE"
     else:
         what = ("above" if w["beyond"] else "at") + f" its resistance {_p(w['level'])}"
-        nxt = "a UTAD that closes back below it = SELL ZONE (the proven setup)"
+        nxt = "don't sell the edge. Only a UTAD that CLOSES back below it is a SELL ZONE"
+    # heal fix 5 · 22-month replay (1h + 4h, 1,590 edge visits): price broke > 1 ATR through the edge 52–63 % of the
+    # time and turned back into the range only 26–39 % — an edge is a place to wait, not a reason to expect a turn
     return (f"👀 <b>{k} · price {what}</b>\n{_esc(nxt)}\n"
+            f"<i>History: from here price broke through more often than it turned (≈ 6 in 10 vs 3 in 10).</i>\n"
             f"<i>Prepare: /zoom {key} for the 15m · /zoom {key} 5m · /why {key} {tf}</i>")
 
 
@@ -137,26 +154,16 @@ DNS = {"TREND ↓", "SELL ZONE", "SELL RALLIES"}
 
 
 def direction(dec: dict, key: str) -> tuple[int, str]:
-    """+1 / −1 / 0 and a label from the four timeframes (actions first, the major swing when the action is neutral)."""
-    up = dn = 0
-    for tf, w in (("4h", 2), ("1h", 1.5), ("15m", 1), ("5m", 0.5)):
-        d = dec.get(f"{key} {tf}")
-        if not d:
-            continue
-        a, m = d["action"], d.get("major")
-        if a in UPS or (a not in DNS and m == 1):
-            up += w
-        elif a in DNS or (a not in UPS and m == -1):
-            dn += w
-    n_up = sum(1 for tf in ("4h", "1h", "15m", "5m") if (dec.get(f"{key} {tf}") or {}).get("action") in UPS or
-               ((dec.get(f"{key} {tf}") or {}).get("action") not in DNS and (dec.get(f"{key} {tf}") or {}).get("major") == 1))
-    n_dn = sum(1 for tf in ("4h", "1h", "15m", "5m") if (dec.get(f"{key} {tf}") or {}).get("action") in DNS or
-               ((dec.get(f"{key} {tf}") or {}).get("action") not in UPS and (dec.get(f"{key} {tf}") or {}).get("major") == -1))
-    if up - dn >= 2:
-        return 1, f"▲ UP {n_up}/4"
-    if dn - up >= 2:
-        return -1, f"▼ DOWN {n_dn}/4"
-    return 0, f"◆ MIXED {n_up}↑ {n_dn}↓"
+    """Heal fix 4 · the board no longer adds trend votes into UP / DOWN / MIXED (49.5 % right live, 48–51 % on 22
+    months of replay — a coin). It shows the one read that beat the coin out of sample: the course's BLUE swing
+    (ease of movement, WTC P-S5 traffic light) on the 1h — the last finished swing travelled further on less effort
+    than the one before. Replay: 53 % in-sample, 58 % hold-out over the next 12 h. Weak evidence, said as such."""
+    f = (dec.get(f"{key} 1h") or {}).get("flow") or 0
+    if f == 1:
+        return 1, "▲ EASE 1h · weak 56%"
+    if f == -1:
+        return -1, "▼ EASE 1h · weak 56%"
+    return 0, "◆ NONE no tested read"
 
 
 SHORT_ACT = {"BUY ZONE": "BUY ZONE", "SELL ZONE": "SELL ZONE", "BUY PULLBACKS": "BUY PB", "SELL RALLIES": "SELL RALLY",
@@ -165,22 +172,25 @@ SHORT_ACT = {"BUY ZONE": "BUY ZONE", "SELL ZONE": "SELL ZONE", "BUY PULLBACKS": 
 
 
 def do_line(d4: dict, d1: dict, d15: dict, d5: dict) -> str:
-    """One instruction per pair: the highest timeframe that has something to do decides."""
+    """One instruction per pair. Only a fresh, unbroken phase-C setup is an instruction to act."""
     for tf, d in (("15m", d15), ("5m", d5)):
         if d.get("strong"):
             return f"{tf} {d['action']} at the HTF edge — {d['trigger']}"
     for tf, d in (("4h", d4), ("1h", d1)):
-        a = d.get("action")
-        if a in BULL | BEAR:
-            return f"{tf} {a} — {d['trigger']} · invalid {d.get('invalid', '—')}"
-        if a == "WATCH":
-            return f"{tf} WATCH — be at the chart: {d['trigger']}"
-        if a == "NO NEW ENTRIES":
+        if act_ok(d):
+            return f"{tf} {d['action']} — {d['trigger']} · invalid {d.get('invalid', '—')}"
+        if d.get("action") == "NO NEW ENTRIES":
             return f"no new entries — {d['do']}"
     for tf, d in (("4h", d4), ("1h", d1)):
-        if d.get("action") == "WAIT" and d.get("levels"):
+        if d.get("failed") or d.get("used"):
+            return f"{tf} {d['do']}"
+    for tf, d in (("4h", d4), ("1h", d1)):
+        if d.get("action") in ("WAIT", "WATCH") and d.get("levels"):
             S, R = d["levels"]
-            return f"wait ({tf} phase {d.get('short', '')[6:7] or '?'}) — long only on a spring below {_p(S)} · short on a UTAD above {_p(R)}"
+            return f"wait ({tf}) — act only on a spring that closes back above {_p(S)} or a UTAD back below {_p(R)}"
+    for tf, d in (("4h", d4), ("1h", d1)):
+        if d.get("action") in BULL | BEAR:
+            return f"{tf} phase D ({d['action'].lower()}) — information only, no tested edge"
     a4 = d4.get("action")
     if a4 in ("TREND ↑", "TREND ↓"):
         return f"4h {a4} — nothing at a level; {d4.get('invalid', '')}"
@@ -191,12 +201,12 @@ def hourly_texts(dec: dict, changes: list, up: list, now) -> tuple[str, str]:
     """(caption for the board photo ≤ 1024, detail text ≤ 4000): the hourly update."""
     keys = [k for k in ("6E", "6B", "6A", "6N", "6J", "6C", "6S", "GC") if f"{k} 4h" in dec]
     loc = now.tz_convert(LOCAL)
-    act = [(k, d) for k, d in dec.items() if not k.startswith("_") and d["action"] in BULL | BEAR and (not k.endswith("m") or d.get("aligned"))]
+    act = [(k, d) for k, d in dec.items() if not k.startswith("_") and act_ok(d) and (not k.endswith("m") or d.get("aligned"))]
     edge = [k for k in keys if any((dec.get(f"{k} {tf}") or {}).get("nest", {}).get("side") for tf in ("15m", "5m"))]
     soon = [e for e in up if pd.Timestamp(e["t"]) <= now + pd.Timedelta(hours=2)]
     dl = (dec.get("_dollar") or "").split("\n")[0].replace("<b>", "").replace("</b>", "").replace("Dollar  ▸ ", "")
     cap = [f"<b>Hourly · {loc.strftime('%a %H:%M')}</b>  {_esc(dl)}"]
-    cap.append("<b>Act</b>  " + (" · ".join(f"{k} {_esc(d['action'])}" for k, d in act[:4]) if act else "nothing confirmed"))
+    cap.append("<b>Phase-C</b>  " + (" · ".join(f"{k} {_esc(d['action'])}" for k, d in act[:4]) if act else "no event now"))
     if edge:
         cap.append("<b>At a 4h/1h edge</b>  " + " · ".join(edge))
     if changes:
@@ -278,7 +288,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
             eff = core.effort(v, t, mins)
             led = swings.ledger(o, h, l, c, eff)
             vs = vsa.read(o, h, l, c, eff, led, n_swings=4, n_bars=5)
-            dec = decide.chart(rec, news.blackout(cal, key, now), _loc)
+            dec = decide.chart(rec, news.blackout(cal, key, now), _loc, tf)
             g = (rec.get("ranges") or [None])[-1]
             lr = next((s for s in reversed(vs["swings"]) if s["dir"] == 1), None)
             lx = next((s for s in reversed(vs["swings"]) if s["dir"] == -1), None)
@@ -291,6 +301,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
             except Exception as e:
                 print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
             dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
+                                          flow=flow(led, len(c) - 1),
                                           caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs),
                                           why=why_text(key, tf, rec, dec), price=float(c[-1]),
                                           bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]), **_extras(vs, rec))
@@ -314,13 +325,13 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
                 eff = core.effort(v, t, scanmod.TF_MIN[tf])
                 led = swings.ledger(o, h, l, c, eff)
                 vs = vsa.read(o, h, l, c, eff, led, n_swings=4, n_bars=5)
-                dec = decide.chart(rec, news.blackout(cal, key, now), _loc)
+                dec = decide.chart(rec, news.blackout(cal, key, now), _loc, tf)
                 g = (rec.get("ranges") or [None])[-1]
                 ns = nested(float(c[-1]), dec_all.get(f"{key} 4h"), dec_all.get(f"{key} 1h"))
                 act = dec["action"]
                 aligned = (ns["side"] == 1 and (act in BULL or (act in ("WATCH", "WAIT") and vs["verdict"].startswith("DEMAND")))) or \
                           (ns["side"] == -1 and (act in BEAR or (act in ("WATCH", "WAIT") and vs["verdict"].startswith("SUPPLY"))))
-                strong = aligned and act in BULL | BEAR
+                strong = aligned and act_ok(dec)
                 tag = (" ✅ entry at the " + ns["tf"] + " edge" if strong else " ◐ supportive at the " + ns["tf"] + " edge" if aligned else "")
                 lr = next((x for x in reversed(vs["swings"]) if x["dir"] == 1), None)
                 lx = next((x for x in reversed(vs["swings"]) if x["dir"] == -1), None)
@@ -371,7 +382,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
 
 def today_text(dec: dict, up24: list, now, health_ok: bool) -> str:
     out = [f"<b>Today · {now.tz_convert(LOCAL).strftime('%a %d %b')}</b>"]
-    act = [(k, d) for k, d in dec.items() if not k.startswith("_") and d["action"] in ACTIONABLE - {"WATCH"}]
+    act = [(k, d) for k, d in dec.items() if not k.startswith("_") and act_ok(d)]
     watch = [(k, d) for k, d in dec.items() if not k.startswith("_") and d["action"] == "WATCH"]
     wait, seenr = [], set()
     for k, d in sorted(((k, d) for k, d in dec.items() if not k.startswith("_") and d["action"] == "WAIT" and d.get("levels")),
@@ -382,10 +393,10 @@ def today_text(dec: dict, up24: list, now, health_ok: bool) -> str:
             wait.append((k, d))
     out.append("")
     if act:
-        out.append("<b>Act on</b>")
+        out.append("<b>Phase-C events</b>  (check on your chart — no edge proven)")
         out += [f"• <b>{k}</b> {_esc(d['action'])} — {_esc(d['short'])}" for k, d in act[:5]]
     else:
-        out.append("<b>Act on</b>  nothing — no chart has a confirmed entry.")
+        out.append("<b>Phase-C events</b>  none right now.")
     if watch or wait:
         out.append("<b>Watch</b>  (a test of the range edge decides these)")
         out += [f"• {k} {_esc(d['action'])} — {_esc(d['short'])}" for k, d in (watch + wait)[:4]]
@@ -398,11 +409,11 @@ def today_text(dec: dict, up24: list, now, health_ok: bool) -> str:
 
 def setups_text(dec: dict, now) -> str:
     items = [(k, d) for k, d in dec.items() if not k.startswith("_")]
-    act = [(k, d) for k, d in items if d["action"] in BULL | BEAR and (not k.endswith("m") or d.get("aligned"))]
-    edge = [(k, d) for k, d in items if k.endswith("m") and d.get("nest", {}).get("side") and not (d["action"] in BULL | BEAR and d.get("aligned"))]
+    act = [(k, d) for k, d in items if act_ok(d) and (not k.endswith("m") or d.get("aligned"))]
+    edge = [(k, d) for k, d in items if k.endswith("m") and d.get("nest", {}).get("side") and not (act_ok(d) and d.get("aligned"))]
     watch = [(k, d) for k, d in items if d["action"] == "WATCH" and not k.endswith("m")]
     out = [f"<b>Setups · {now.tz_convert(LOCAL).strftime('%a %H:%M')}</b>", ""]
-    out.append("<b>Act now</b>" if act else "<b>Act now</b>  nothing confirmed")
+    out.append("<b>Phase-C events</b>  (check on your chart — no edge proven)" if act else "<b>Phase-C events</b>  none right now")
     out += [f"• <b>{k}</b> {_esc(d['action'])} — {_esc(d['short'])}" + (" ✅ at the HTF edge" if d.get("strong") else "") for k, d in act[:6]]
     if edge:
         out.append("<b>At a 4h / 1h edge</b>  (where a 15m / 5m entry comes from)")
@@ -433,7 +444,7 @@ def dollar_text(scan: dict, h1: dict, h4: dict, snap: dict | None, cal: list, no
             continue
         d = d.reset_index(drop=True)
         rec = scanmod.read_one(d, tf, h4.get("DX") if tf == "1h" else None)
-        acts[tf] = decide.chart(rec, None, _loc)["action"]
+        acts[tf] = decide.chart(rec, None, _loc, tf)["action"]
         t = pd.to_datetime(d["time"], utc=True)
         o, h, l, c, v = (d[x].to_numpy(float) for x in ("open", "high", "low", "close", "volume"))
         eff = core.effort(v, t, mins)
@@ -475,6 +486,10 @@ def changes(dec: dict, seen: dict) -> list[tuple[str, str, str]]:
             if d.get("strong") and old is not None and old != cur:
                 out.append((k, old.replace(" ✅", ""), d["action"] + " at the " + d["nest"]["tf"] + " edge"))
             continue
-        if old is not None and old != d["action"] and (d["action"] in ACTIONABLE or old in ACTIONABLE):
+        if old is None or old == d["action"]:
+            continue
+        if act_ok(d):
             out.append((k, old, d["action"]))
+        elif old in ACTIONABLE and (d.get("failed") or d.get("used")):
+            out.append((k, old, "failed" if d.get("failed") else "window closed"))
     return out

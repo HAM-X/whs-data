@@ -15,7 +15,9 @@ import pandas as pd
 from . import core, edgelab, swings
 
 ENTRY = {"BUY ZONE", "SELL ZONE", "BUY PULLBACKS", "SELL RALLIES"}
-BACKTEST = {"ZONE": ("phase-C reversal (Spring / Shakeout / UTAD)", 1.65), "PULLBACK": ("SOS / SOW then LPS / BU", 0.42)}
+# heal: the old 1.65 R came from a full-history Edge Lab run that entered events only confirmed later (hindsight).
+# The robot's own phase-C alerts, replayed live (29 Oct 2026, 1h, 104 alerts), earned −0.12 R each.
+BACKTEST = {"ZONE": ("phase-C event (robot alert), heal replay 1h", -0.12)}
 STOP_ATR, MIN_RISK_ATR, MAX_RISK_ATR = 0.25, 0.2, 3.0
 
 
@@ -23,14 +25,25 @@ def kind(action: str) -> str:
     return "ZONE" if action.endswith("ZONE") else "PULLBACK"
 
 
+def entries(dec: dict) -> list[tuple[str, str, str]]:
+    """Heal fix 7 · every fresh, unbroken phase-C setup on ANY timeframe is logged once (15m / 5m away from
+    a 4h / 1h edge as a SHADOW call): the self-grade fills up in weeks instead of never (0 calls in the 27–29 Oct
+    audit). Same (chart, action, action) shape as cards.changes()."""
+    return [(k, "", d["action"]) for k, d in dec.items()
+            if not k.startswith("_") and d.get("setup") and d.get("action") in ("BUY ZONE", "SELL ZONE")]
+
+
 def new_calls(changes: list, dec: dict, calls: list) -> list[dict]:
-    """changes = cards.changes() output. Returns the calls opened now (also appended to `calls`)."""
+    """changes = cards.changes() or entries() output. Returns the calls opened now (also appended to `calls`)."""
     out = []
     have = {(c["key"], c["tf"], c["bar"]) for c in calls}
+    ideas = {(c["key"], c["tf"], round(c.get("inv", float("nan")), 9)) for c in calls if c.get("inv") is not None}
     for k, old, new in changes:
         d = dec.get(k) or {}
         act = d.get("action")
         if act not in ENTRY or d.get("stop") is None or d.get("price") is None:
+            continue
+        if (k.split()[0], k.split()[1], round(float(d["stop"]), 9)) in ideas:      # the same idea, a later bar
             continue
         key, tf = k.split()
         side, e, atr = d["side"], d["price"], d.get("atr") or 0
@@ -39,7 +52,8 @@ def new_calls(changes: list, dec: dict, calls: list) -> list[dict]:
         if not atr or risk < MIN_RISK_ATR * atr or risk > MAX_RISK_ATR * atr or (key, tf, d.get("bar")) in have:
             continue
         c = dict(id=f"{k} {d.get('bar')}", key=key, tf=tf, action=act, kind=kind(act), side=side, bar=d.get("bar"),
-                 entry=float(e), stop=float(stop), target=d.get("target"), status="open", r=0.0, best=0.0, held=0)
+                 entry=float(e), stop=float(stop), target=d.get("target"), status="open", r=0.0, best=0.0, held=0,
+                 inv=float(d["stop"]), shadow=bool(tf in ("15m", "5m") and not d.get("strong")))
         calls.append(c)
         out.append(c)
     return out
@@ -95,8 +109,9 @@ def report(calls: list, now, days: int = 7) -> str:
         cs = [c for c in done if c["kind"] == kd]
         if cs:
             out.append(f"• {name}: live {np.mean([c['r'] for c in cs]):+.2f}R on {len(cs)} vs backtest {bt:+.2f}R")
-    for tfs, label in ((("4h", "1h"), "4h / 1h"), (("15m", "5m"), "15m / 5m at an edge")):
-        cs = [c for c in done if c["tf"] in tfs]
+    for tfs, label, sh in ((("4h", "1h"), "4h / 1h", False), (("15m", "5m"), "15m / 5m at an edge", False),
+                           (("15m", "5m"), "15m / 5m shadow (not at an edge)", True)):
+        cs = [c for c in done if c["tf"] in tfs and bool(c.get("shadow")) == sh]
         if cs:
             out.append(f"• {label}: {len(cs)} calls, avg {np.mean([c['r'] for c in cs]):+.2f}R")
     if opn:

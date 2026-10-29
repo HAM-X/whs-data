@@ -236,7 +236,7 @@ export function panelReport(pn) {
   const top = (pn.top3 || []).map((x, i) => `${i + 1}. ${x.key} — ${x.why.join(", ")}`);
   o.push(top.length ? "Top 3:\n" + top.join("\n") : "Top 3: nothing stands out.");
   const pers = Object.entries(pn.persistence || {}).map(([c, t]) => `${c} ${t}`);
-  if (pers.length) o.push("Strength: " + pers.join(" · "));
+  if (pers.length) o.push("Strength (context only, no edge in 2 years): " + pers.join(" · "));
   for (const [k, lab] of [["dx_high", "DX new major high"], ["dx_low", "DX new major low"]]) {
     const s = (pn.sweet_spot || {})[k];
     if (s && s.new_extreme) {
