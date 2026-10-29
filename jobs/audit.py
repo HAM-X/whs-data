@@ -100,7 +100,7 @@ def text(sc: dict, days: int, n_snap: int) -> str:
         from whs import hierarchy as hz
         lp = DATA / "htr_log.json"
         if lp.exists():
-            o.append("<b>Ranges within ranges</b> (forward log since it went live)")
+            o.append("<b>Campaign reads + ranges within ranges</b> (forward log since it went live; replay: the read beat chance by +3.3 pts)")
             o.append(hz.claims_report(json.loads(lp.read_text())))
     except Exception as e:
         o.append(f"• range hierarchy log unreadable: {type(e).__name__}")

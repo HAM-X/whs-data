@@ -111,6 +111,7 @@ jobs:
             {"command":"zoom","description":"15m or 5m read against the 4h and 1h edges — /zoom 6E 5m"},
             {"command":"vsa","description":"Rallies, reactions, bars in VSA notation — /vsa 6E 15m"},
             {"command":"why","description":"The Wyckoff story: events, phases, bias — /why 6E"},
+            {"command":"story","description":"The campaign read, 1D to 15m: confirm, invalidate, watch, odds — /story gc"},
             {"command":"htr","description":"Ranges within ranges, 1D to 15m — /htr gc"},
             {"command":"trend","description":"Major trend, protected level, swing structure — /trend gc 15m"},
             {"command":"swings","description":"Every recent swing in VSA notation — /swings 6E 1h"},

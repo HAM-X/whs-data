@@ -239,9 +239,17 @@ def hourly_texts(dec: dict, changes: list, up: list, now) -> tuple[str, str]:
         ns = d15.get("nest") or {}
         if ns.get("side"):
             lines.append("   edge  " + _esc(ns["line"]) + (" ◐" if d15.get("aligned") or d5.get("aligned") else ""))
+        cm = (dec.get("_camp") or {}).get(k) or {}
+        live = [(tf, x) for tf, x in cm.items() if x.get("grade") != "resolved"]
+        lv = dict(live)
+        st_ = ("4h", lv["4h"]) if "4h" in lv else (live[0] if live else None)
+        if st_:
+            tf_, x = st_
+            ch = f" · odds up {round(100 * x['chance'])}%" if x.get("chance") is not None else ""
+            lines.append(f"   <b>read</b>  {tf_} {_esc(x['label'])}{ch}")
         lines.append("   <b>do</b>  " + _esc(do_line(d4, d1, d15, d5)))
         body.append("\n".join(lines))
-    text = "\n\n".join(body) + "\n\n<i>/chart · /zoom · /vsa · /why any pair · /hourly off to stop these</i>"
+    text = "\n\n".join(body) + "\n\n<i>/story · /chart · /zoom · /vsa any pair · /hourly off to stop these</i>"
     return "\n".join(cap)[:1024], text[:4000]
 
 
@@ -378,6 +386,12 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
             hz = hierarchy.describe(key, recs, verdicts, px)
             dec_all.setdefault("_htr", {})[key] = hz["text"]
             dec_all.setdefault("_htr_frames", {})[key] = hz["frames"]
+            # the campaign story (Hamza 30 Oct): one live read per range, top-down, with confirm / invalidate / watch
+            tfbars = {(key, "1d"): d1, (key, "4h"): h4.get(key), (key, "1h"): h1.get(key),
+                      (key, "15m"): ((ltf or {}).get("15m") or {}).get(key)}
+            rds = hierarchy.reads(key, recs, px, tfbars, atrs)
+            dec_all.setdefault("_story", {})[key] = hierarchy.story_text(key, rds, px)
+            dec_all.setdefault("_camp", {})[key] = hierarchy.state_of(rds)
         except Exception as e:
             print(f"[hierarchy error] {key}: {type(e).__name__}: {e}")
     global LAST_RECS, LAST_ATRS

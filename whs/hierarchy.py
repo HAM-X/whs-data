@@ -18,6 +18,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import campaign as cp, core
+
 TF_ORDER = ["1d", "4h", "1h", "15m"]
 CHILD = {"1d": "4h", "4h": "1h", "1h": "15m"}
 TF_MIN = {"1d": 1440, "4h": 240, "1h": 60, "15m": 15}
@@ -201,7 +203,14 @@ def touches(key: str, recs: dict, bars_15m: pd.DataFrame | None, since, atrs: di
     out = []
     if bars_15m is None or not len(bars_15m):
         return out
-    b = bars_15m[pd.to_datetime(bars_15m["time"], utc=True) > pd.Timestamp(since)]
+    tt = pd.to_datetime(bars_15m["time"], utc=True)
+    try:                                   # the touch bar, graded by effort and result (whs/campaign.touch_grade)
+        eff15 = core.effort(bars_15m["volume"].to_numpy(float), tt, 15)
+        atr15 = core.atr(bars_15m["high"].to_numpy(float), bars_15m["low"].to_numpy(float), bars_15m["close"].to_numpy(float))
+    except Exception:
+        eff15 = atr15 = None
+    pos = {ts: i for i, ts in enumerate(tt)}
+    b = bars_15m[tt > pd.Timestamp(since)]
     for tf in TF_ORDER:
         P = live_range(recs.get((key, tf)))
         if not P or not edges_confirmed(P):
@@ -217,11 +226,16 @@ def touches(key: str, recs: dict, bars_15m: pd.DataFrame | None, since, atrs: di
                     armed[k] = True
                 if hit and armed.get(k, True):
                     armed[k] = False
+                    i = pos.get(pd.Timestamp(x["time"]).tz_convert("UTC") if pd.Timestamp(x["time"]).tzinfo else pd.Timestamp(x["time"], tz="UTC"))
+                    grade, gs = ("undecided (no effort data)", 0)
+                    if i is not None and eff15 is not None:
+                        grade, gs = cp.touch_grade(float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"]),
+                                                   float(eff15[i]), float(atr15[i - 1] if i else atr15[i]), side)
                     inv = float(x["high"] + 0.25 * a) if side == 1 else float(x["low"] - 0.25 * a)
                     out.append(dict(key=key, tf=tf, side=side, level=lvl, t=pd.Timestamp(x["time"]).isoformat(),
                                     beyond=bool(x["high"] > R) if side == 1 else bool(x["low"] < S),
                                     events=event_line(P, 4), phase=P["phase"], id=P["id"],
-                                    c=float(x["close"]), inv=inv, target=(S + R) / 2))
+                                    c=float(x["close"]), inv=inv, target=(S + R) / 2, grade=grade, gsign=gs))
     return out
 
 
@@ -246,7 +260,10 @@ def touches_text(ts: list[dict]) -> str:
         when = pd.Timestamp(t["t"]).tz_convert("Africa/Nairobi").strftime("%a %H:%M")
         tfs = " · ".join(dict.fromkeys(TF_NAME[x["tf"]] for x in g))
         out.append(f"• <b>{tfs}</b> range {edge} {_p(t['level'])}{' (and beyond)' if t['beyond'] else ''} · {when} · phase {t['phase']} · {t['events']}")
-    out.append(f"<i>B setups at best. History: {touch_history(t['tf'] for t in ts)}.</i>")
+        if t.get("grade"):
+            out.append(f"   the touch bar: <b>{t['grade']}</b>")
+    out.append(f"<i>B setups at best. History: {touch_history(t['tf'] for t in ts)}. Graded touches sat at their own "
+               f"chance too (replay, 259 touches) — the grade describes the bar, it is not an edge.</i>")
     return "\n".join(out)
 
 
@@ -369,7 +386,8 @@ def score_claims(log: list, bars_15m: dict, cap: int = 960) -> list:
             if (lo[j] <= c["target"]) if s == -1 else (hi[j] >= c["target"]):
                 c["status"] = "hit"
                 break
-            if (cl[j] > c["inv"]) if s == -1 else (cl[j] < c["inv"]):
+            wick = c.get("wick")             # campaign claims: both sides on the wick (R + ½H vs S − ½H)
+            if ((hi[j] if wick else cl[j]) > c["inv"]) if s == -1 else ((lo[j] if wick else cl[j]) < c["inv"]):
                 c["status"] = "miss"
                 break
         else:
@@ -378,14 +396,120 @@ def score_claims(log: list, bars_15m: dict, cap: int = 960) -> list:
     return log
 
 
+def campaign_claim(key: str, st: dict, price: float, when) -> dict | None:
+    """The read as a forward claim: the range resolves to its side first (R + ½H up / S − ½H down)."""
+    H = st["R"] - st["S"]
+    if not st["side"] or H <= 0 or st.get("grade") == "resolved":
+        return None
+    up, dn = st["R"] + 0.5 * H, st["S"] - 0.5 * H
+    c = log_claim("campaign", key, st["tf"], st["side"], price, up if st["side"] > 0 else dn, dn if st["side"] > 0 else up, when)
+    if c:
+        c.update(wick=True, label=st["label"], grade=st["grade"], phase=st["phase"])
+    return c
+
+
 def claims_report(log: list) -> str:
     out = []
-    for kind, lab in (("child", "Child range at a parent edge, pointing back in"), ("touch", "First touch of a confirmed edge")):
+    for kind, lab in (("campaign", "Campaign read (resolves to its side first)"), ("child", "Child range at a parent edge, pointing back in"),
+                      ("touch", "First touch of a confirmed edge")):
         done = [c for c in log if c["kind"] == kind and c["status"] != "open"]
         if not done:
             out.append(f"• {lab}: no finished cases yet ({sum(1 for c in log if c['kind'] == kind)} open)")
             continue
         hit = sum(c["status"] == "hit" for c in done)
         ch = 100 * sum(c["chance"] for c in done) / len(done)
-        out.append(f"• {lab}: reached the range middle first {100 * hit / len(done):.0f}% of {len(done)} (random-walk chance {ch:.0f}%)")
+        what = "resolved to its side first" if kind == "campaign" else "reached the range middle first"
+        out.append(f"• {lab}: {what} {100 * hit / len(done):.0f}% of {len(done)} (random-walk chance {ch:.0f}%)")
     return "\n".join(out)
+
+
+# ───────────────────────────── the campaign story (Hamza 30 Oct 2026) ─────────────────────────────
+# What the course-logic read (whs/campaign.py) has added over the position chance in the replay (Heal study no.3,
+# 514 ranges, bootstrap by range): points of "called the side it resolved to" above chance.
+TRACK = {"all": (3.3, 514), "A": (3.8, 416), "B": (5.7, 218), "C": (-2.1, 109), "D": (1.8, 207)}
+PNF_NOTE = "A yardstick, not a magnet (replay: hit about as often as any target of the same size)"
+ROLE = ("campaign", "structure", "test", "test")
+
+
+def _rng(P: dict) -> dict:
+    return dict(S=P["support"], R=P["resistance"], kind=P.get("kind"), phase=P.get("phase"), outcome=P.get("outcome"),
+                events=P.get("ev2") or [])
+
+
+def _major(rec: dict | None) -> int:
+    m = (rec or {}).get("major")
+    return int(m.get("state") or 0) if isinstance(m, dict) else int(m or 0)
+
+
+def reads(key: str, recs: dict, price: float, bars: dict | None = None, atrs: dict | None = None) -> list[dict]:
+    """The campaign read of every live range of `key`, top-down (1D → 15m), with the minor ranges at its edges."""
+    frames = {f["tf"]: f for f in describe(key, recs, {k: (r or {}).get("verdict", "") for k, r in recs.items()}, price)["frames"]}
+    out = []
+    for tf in TF_ORDER:
+        rec = recs.get((key, tf))
+        P = live_range(rec)
+        if not P:
+            continue
+        kids = (frames.get(tf) or {}).get("children") or []
+        rd = cp.read(_rng(P), price, sw=(rec or {}).get("sw"), verdict=(rec or {}).get("verdict", ""), major=_major(rec), children=kids)
+        rd.update(tf=tf, id=P["id"], kids=kids, edges=edges_confirmed(P), events=event_line(P, 5))
+        b = (bars or {}).get((key, tf))
+        a = (atrs or {}).get((key, tf))
+        if b is not None and a:
+            t = pd.to_datetime(b["time"], utc=True)
+            cl = b["close"].to_numpy(float)[int(np.searchsorted(t.values, pd.Timestamp(P["id"]).to_datetime64())):]
+            rd["obj"] = cp.objectives(rd, cl, a)
+        out.append(rd)
+    return out
+
+
+def _odds_line(rd: dict) -> str:
+    if rd["chance_up"] is None:
+        return "▸ <b>Odds</b> — the structure range has resolved; odds come back with the next range"
+    up = round(100 * rd["chance_up"])
+    s = f"▸ <b>Odds</b> it resolves up first {up}% · down {100 - up}% (from where price sits). "
+    if not rd["side"]:
+        return s + "The read has no side to call yet"
+    tr = TRACK.get(rd["phase"]) or TRACK["all"]
+    return s + f"Reads like this beat chance by {tr[0]:+.1f} pts in the replay (phase {rd['phase']}, n {tr[1]} ranges)"
+
+
+def story_text(key: str, rds: list[dict], price: float | None = None) -> str:
+    if not rds:
+        return f"📖 <b>{key} · the story</b>\nno live range with a confirmed AR on 1D–15m — no campaign to read"
+    lines = [f"📖 <b>{key} · the story</b>"]
+    live = [r for r in rds if r["grade"] != "resolved"]
+    struct = next((r for r in live if r["tf"] == "4h"), None) or (live[0] if live else rds[0])
+    shown = []
+    for i, rd in enumerate(rds):
+        same = next((x for x in shown if _overlap(dict(S=x["S"], R=x["R"]), dict(support=rd["S"], resistance=rd["R"])) >= 0.8), None)
+        role = "campaign" if i == 0 else "structure" if rd is struct else "test"
+        if same:
+            role = f"(same box as the {TF_NAME[same['tf']]})"
+        shown.append(rd)
+        where = f" · {cp.where_text(rd, price)}" if price is not None and not same else ""
+        lines.append(f"<b>{TF_NAME[rd['tf']]} {role}</b> {_p(rd['S'])} – {_p(rd['R'])} · phase {rd['phase']} · "
+                     f"<b>{cp.label_text(rd)}</b>{where}")
+        why = cp.items_text(rd, 3)
+        if why:
+            lines.append(f"   {why}")
+    lines.append(f"▸ <b>Confirms</b> {struct['confirm']} ({TF_NAME[struct['tf']]})")
+    if struct["side"] and struct["grade"] != "resolved":
+        lines.append(f"▸ <b>Invalidates</b> {struct['invalid']}")
+    lines.append(f"▸ <b>Watching next</b> {struct['watch']}")
+    o = struct.get("obj")
+    if o and struct["side"] and struct["grade"] != "resolved":
+        edge = struct["S"] if struct["side"] < 0 else struct["R"]
+        beyond = (o["cons"] < edge) if struct["side"] < 0 else (o["cons"] > edge)
+        lines.append(f"▸ <b>Count</b> {_p(o['cons'])} (from the {'top' if struct['side'] < 0 else 'low'}) – {_p(o['aggr'])} "
+                     f"(from the count line), {o['cols']} columns"
+                     + ("" if beyond else f" — the cause built so far does not yet reach beyond the {'support' if struct['side'] < 0 else 'resistance'}")
+                     + f". {PNF_NOTE}")
+    lines.append(_odds_line(struct))
+    return "\n".join(lines)
+
+
+def state_of(rds: list[dict]) -> dict:
+    """What the quiet alerts compare run to run: per timeframe the range and its read."""
+    return {rd["tf"]: dict(id=rd["id"], label=rd["label"], side=rd["side"], grade=rd["grade"], S=rd["S"], R=rd["R"], chance=rd["chance_up"],
+                           inv=rd.get("inv_p"), phase=rd["phase"]) for rd in rds}

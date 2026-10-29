@@ -175,12 +175,12 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
                 state["last_brief_day"] = local.strftime("%Y-%m-%d")
         if alerts:
             try:                                   # ranges within ranges: touches, child ranges, facts, corrections
-                hmsg = hierarchy_alerts(now, dec, ltf, state)
+                hmsg = hierarchy_alerts(now, dec, ltf, state, h1)
                 if is_open(now):
                     for m in hmsg[:6]:
                         telegram.send(m, html=True)
                     if len(hmsg) > 6:
-                        telegram.send(f"🧾 {len(hmsg) - 6} more range facts this hour — /htr 6E (any pair) shows the full hierarchy", html=True)
+                        telegram.send(f"📖 {len(hmsg) - 6} more changes this hour — /story 6E (any pair) shows the full read", html=True)
             except Exception as e:
                 print(f"[hierarchy alerts error] {type(e).__name__}: {e}")
             state["decisions"] = {k: d["action"] if not k.endswith("m") or not d.get("strong") else d["action"] + " ✅"
@@ -202,13 +202,18 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
         return None
 
 
-def hierarchy_alerts(now, dec: dict, ltf: dict | None, state: dict) -> list[str]:
-    """Messages for the range hierarchy since the last run (whs/hierarchy.py). Updates `state` in place.
-    The first run only records (no burst of alerts)."""
+def hierarchy_alerts(now, dec: dict, ltf: dict | None, state: dict, h1: dict | None = None) -> list[str]:
+    """Quiet by default (Hamza 30 Oct): a message only when something CHANGED —
+      📖 the campaign read of a range changed (and held two runs) → the whole story, top-down
+      ✅ / ❌ price closed through the read's confirmation / invalidation level
+      📏 a touch of a confirmed edge, graded by its bar (he asked for every one; one message per future per run)
+      ✏️ a correction of a phase-C label (held two runs)
+    Every read change is logged as a forward claim and scored on 15m bars (1h for 4h / 1D). Updates `state` in place.
+    The first run only records."""
     from whs import cards, hierarchy as hz
     recs, atrs = cards.LAST_RECS, cards.LAST_ATRS
     now = pd.Timestamp(now).tz_convert("UTC")
-    first = "htr_facts" not in state
+    first = "htr_facts" not in state or "camp" not in state
     since = pd.Timestamp(state.get("htr_since") or (now - pd.Timedelta(hours=1)).isoformat())
     armed = state.get("htr_armed") or {}
     msgs = []
@@ -217,41 +222,76 @@ def hierarchy_alerts(now, dec: dict, ltf: dict | None, state: dict) -> list[str]
         log = json.loads(lpath.read_text()) if lpath.exists() else []
     except Exception:
         log = []
+    b15 = (ltf or {}).get("15m", {})
     for key in sorted({k for k, _ in recs}):
-        b15 = (ltf or {}).get("15m", {}).get(key)
-        ts = hz.touches(key, recs, b15, since, atrs, armed)
+        ts = hz.touches(key, recs, b15.get(key), since, atrs, armed)
         if ts:
             msgs.append(hz.touches_text(ts))
             for t in ts:
                 c = hz.log_claim("touch", key, t["tf"], -t["side"], t["c"], t["target"], t["inv"], t["t"])
                 if c:
+                    c["grade"] = t.get("grade")
                     log.append(c)
+    # corrections of earlier labels (two runs); new facts no longer get a message of their own — the story does
     cur = hz.facts(recs)
     live = {g["id"] for rec in recs.values() for g in (rec or {}).get("ranges") or []}
     pending = {}
     if not first:
-        new, corr, pending = hz.diff_facts(state["htr_facts"], cur, state.get("htr_pending") or {}, live)
-        msgs += [hz.correction_text(f) for f in corr]
-        msgs += [hz.fact_text(f, cur) for f in new if hz.alert_fact(f)]
-    seen = state.get("htr_children") or {}
-    for key, frames in (dec.get("_htr_frames") or {}).items():
-        changed = False
-        for fr in frames:
-            for ch in fr["children"]:
-                k, tag = f"{key}|{fr['tf']}|{ch['id']}", f"{ch['outcome']}|{ch['own_c']}|{ch['back_in']}"
-                if seen.get(k) != tag:
-                    seen[k], changed = tag, True
-                    px = float((dec.get(f"{key} {ch['tf']}") or {}).get("price") or 0)
-                    if ch["back_in"] and not first and px:
-                        c = hz.log_claim("child", key, fr["tf"], -ch["zone"], px, ch["target"], ch["inv"], now)
-                        if c:
-                            log.append(c)
+        _, corr, pending = hz.diff_facts(state["htr_facts"], cur, state.get("htr_pending") or {}, live)
+        msgs += [hz.correction_text(f) for f in corr if f["fam"] in hz.PHASE_C or f["fam"] in ("BO", "SC", "BC", "AR")]
+    # the campaign reads: change of read (held two runs) · confirmation / invalidation closes
+    camp_prev, camp_pend, hits = state.get("camp") or {}, state.get("camp_pend") or {}, state.get("camp_hits") or {}
+    camp_now, nxt_pend = {}, {}
+    for key, frames in (dec.get("_camp") or {}).items():
+        changed = []
+        px = float((dec.get(f"{key} 1h") or {}).get("price") or 0)
+        for tf, st in frames.items():
+            st = dict(st, tf=tf)
+            k = f"{key}|{tf}"
+            old = camp_prev.get(k)
+            tag = f"{st['id']}|{st['label']}"
+            if old and old.get("tag") != tag and old.get("id") == st["id"]:
+                if camp_pend.get(k) == tag:           # the new read held a second run → announce (15m: in the story only)
+                    if tf != "15m":
+                        changed.append((tf, old.get("label"), st["label"]))
+                    c = hz.campaign_claim(key, st, px, now) if px else None
+                    if c:
+                        log.append(c)
+                    camp_now[k] = dict(st, tag=tag)
+                else:
+                    nxt_pend[k] = tag
+                    camp_now[k] = old                  # keep the announced read until the change holds
+            else:
+                camp_now[k] = dict(st, tag=tag)
+                if not old and not first and st["side"]:
+                    c = hz.campaign_claim(key, st, px, now) if px else None   # a new range read: log it quietly
+                    if c:
+                        log.append(c)
+            # closes through the read's levels (the 1h close; once per range and level)
+            if st["side"] and px and tf in ("1d", "4h", "1h") and st.get("grade") != "resolved":
+                conf = st["R"] if st["side"] > 0 else st["S"]
+                inv = st.get("inv") if st.get("inv") is not None else (st["S"] if st["side"] > 0 else st["R"])
+                for what, lvl, beyond in (("confirm", conf, (px > conf) if st["side"] > 0 else (px < conf)),
+                                          ("invalid", inv, (px < inv) if st["side"] > 0 else (px > inv))):
+                    hk = f"{k}|{st['id']}|{what}|{st['side']}"
+                    if beyond and not hits.get(hk):
+                        hits[hk] = now.isoformat()
+                        if not first:
+                            msgs.append((f"✅ <b>{key} {hz.TF_NAME[tf]} · the read's confirmation:</b> a close "
+                                         f"{'above' if st['side'] > 0 else 'below'} {hz._p(lvl)} — {st['label']} → phase D"
+                                         if what == "confirm" else
+                                         f"❌ <b>{key} {hz.TF_NAME[tf]} · the read is invalidated:</b> a close "
+                                         f"{'below' if st['side'] > 0 else 'above'} {hz._p(lvl)} — {st['label']} no longer holds")
+                                        + "\n/story " + key.lower() + " for the full picture")
         if changed and not first:
-            msgs.append("🧩 " + dec["_htr"][key])
+            what = " · ".join(f"{hz.TF_NAME[tf]} {a or 'new'} → <b>{b}</b>" for tf, a, b in changed)
+            msgs.append(f"📖 <b>{key} · the read changed</b>: {what}\n" + dec["_story"][key].split("\n", 1)[1])
     state.update(htr_since=now.isoformat(), htr_armed=armed, htr_facts=cur, htr_pending=pending,
-                 htr_children=dict(list(seen.items())[-400:]))
-    hz.score_claims(log, (ltf or {}).get("15m", {}))
-    lpath.write_text(json.dumps(log[-3000:], indent=0))
+                 camp=camp_now, camp_pend=nxt_pend, camp_hits=dict(list(hits.items())[-600:]))
+    bars = {k: b for k, b in b15.items()}
+    hz.score_claims([c for c in log if c["tf"] in ("15m", "1h") or c["kind"] != "campaign"], bars)
+    hz.score_claims([c for c in log if c["kind"] == "campaign" and c["tf"] in ("4h", "1d")], h1 or {}, cap=2400)
+    lpath.write_text(json.dumps(log[-4000:], indent=0))
     dec["_htr_claims"] = hz.claims_report(log)
     return [] if first else msgs
 
