@@ -23,7 +23,7 @@
   "6E 4h": "WAIT",
   "6E 1h": "WAIT",
   "6E 15m": "WAIT",
-  "6E 5m": "SELL RALLIES",
+  "6E 5m": "WAIT",
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
   "6B 15m": "TREND \u2191",
