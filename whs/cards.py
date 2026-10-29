@@ -19,10 +19,12 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-from . import core, decide, news, render, scan as scanmod, swings, vsa
+from . import core, decide, hierarchy, news, render, scan as scanmod, swings, vsa
 from .config import FUTURES
 
 LOCAL = "Africa/Nairobi"
+LAST_RECS: dict = {}     # (key, tf) → scan record of the last build (1D, 4h, 1h, 15m) — for the hierarchy alerts
+LAST_ATRS: dict = {}
 SIGNAL_ALERTS = False   # Hamza 29 Oct: "I don't want your signals, I want the fact as it comes and confirms itself" —
                         # no 🔔 for phase-C setups; they stay on the cards / board and are still logged as calls
 ACTIONABLE = {"BUY ZONE", "SELL ZONE"}   # heal: only phase-C entries alert (phase D / WATCH: no edge in the replay)
@@ -269,6 +271,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
     now = pd.Timestamp(now).tz_convert("UTC")
     outdir = outdir or tempfile.mkdtemp(prefix="whs_cards_")
     dec_all, images, board_rows = {}, {}, []
+    recs, verdicts, atrs = {}, {}, {}
     up24 = news.grouped(news.upcoming(cal, now, 24))
     for key in FUTURES:
         if FUTURES[key].get("context") or f"{key} 4h" not in scan:
@@ -300,6 +303,7 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
                 images[f"card:{key}:{tf}"] = png
             except Exception as e:
                 print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
+            recs[(key, tf)], verdicts[(key, tf)], atrs[(key, tf)] = rec, vs["verdict"], float(core.atr(h, l, c)[-1])
             dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
                                           flow=flow(led, len(c) - 1),
                                           caption=caption(key, tf, dec, g, ctl, news_line), vsa=vsa_text(key, tf, t, vs),
@@ -352,12 +356,32 @@ def build(now, scan: dict, cal: list, h1: dict, h4: dict, health_ok: bool = True
                     images[f"card:{key}:{tf}"] = png
                 except Exception as e:
                     print(f"[card error] {key} {tf}: {type(e).__name__}: {e}")
+                if tf in hierarchy.TF_MIN:          # the hierarchy runs 1D → 15m, never lower (Hamza 29 Oct)
+                    recs[(key, tf)], verdicts[(key, tf)], atrs[(key, tf)] = rec, vs["verdict"], float(core.atr(h, l, c)[-1])
                 dec_all[f"{key} {tf}"] = dict(dec, control=ctl, verdict=vs["verdict"], levels=[g["support"], g["resistance"]] if g else None,
                                               caption=cap, vsa=vsa_text(key, tf, t, vs), why=why_text(key, tf, rec, dec),
                                               nest=ns, aligned=bool(aligned), strong=bool(strong), price=float(c[-1]),
                                               bar=t.iloc[-1].isoformat(), atr=float(core.atr(h, l, c)[-1]), **_extras(vs, rec))
             except Exception as e:
                 print(f"[ltf read error] {key} {tf}: {type(e).__name__}: {e}")
+        # ---- 1D + the range hierarchy (1D → 4h → 1h → 15m) ----
+        try:
+            d1 = hierarchy.daily_bars(h1[key]) if h1.get(key) is not None else None
+            if d1 is not None and len(d1) >= 120:
+                d1 = d1.tail(400).reset_index(drop=True)
+                o, h, l, c, v = (d1[x].to_numpy(float) for x in ("open", "high", "low", "close", "volume"))
+                eff = core.effort(v, d1["time"], 1440)
+                recs[(key, "1d")] = scanmod.read_one(d1, "1d", None)
+                verdicts[(key, "1d")] = vsa.read(o, h, l, c, eff, swings.ledger(o, h, l, c, eff))["verdict"]
+                atrs[(key, "1d")] = float(core.atr(h, l, c)[-1])
+            px = float(h1[key]["close"].iloc[-1])
+            hz = hierarchy.describe(key, recs, verdicts, px)
+            dec_all.setdefault("_htr", {})[key] = hz["text"]
+            dec_all.setdefault("_htr_frames", {})[key] = hz["frames"]
+        except Exception as e:
+            print(f"[hierarchy error] {key}: {type(e).__name__}: {e}")
+    global LAST_RECS, LAST_ATRS
+    LAST_RECS, LAST_ATRS = recs, atrs
     png = os.path.join(outdir, "board.png")
     try:
         rows4 = []

@@ -98,6 +98,9 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None, ctx: dict 
             "name": rr.name or f"{rr.bull_name} / {rr.bear_name}",
             "support": float(min(rr.support, rr.resistance)), "resistance": float(max(rr.support, rr.resistance)),
             "events": [(t.iloc[e.known].isoformat(), e.name, e.state, float(e.price)) for e in rr.events if not e.hidden],
+            # full event detail for the range hierarchy (whs/hierarchy.py): extreme bar, known bar, role, side
+            "ev2": [dict(b=t.iloc[e.bar].isoformat(), k=t.iloc[e.known].isoformat(), n=e.name, r=e.role, s=int(e.side),
+                         st=e.state, p=float(e.price)) for e in rr.events if not e.hidden],
             "alerts": [(t.iloc[b].isoformat(), txt) for b, txt in rr.alerts],
             "story": [f"#{k} {p}: {txt}" for k, p, txt in st.steps], "bias": st.bias,
         })

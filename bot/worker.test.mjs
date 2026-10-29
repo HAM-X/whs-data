@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { route, size, findSymbol, toMt5, tvMessage } from "./worker.js";
+import { route, size, findSymbol, toMt5, tvMessage, htrReply } from "./worker.js";
 
 const snap = JSON.parse(fs.readFileSync(new URL("./fixtures/snapshot.sample.json", import.meta.url)));
 const strip = (s) => s.replace(/<[^>]+>/g, "");
@@ -172,4 +172,11 @@ test("/hourly shows the board + the per-pair detail", () => {
   const d = { ...dec, _hourly: { caption: "<b>Hourly</b>", body: "<b>6E</b> ▼ DOWN" } };
   assert.deepEqual(route("/hourly", snap, {}, { __dec: d }), { photo: "board", caption: "<b>Hourly</b>", then: "<b>6E</b> ▼ DOWN" });
   assert.equal(route("overview of all pairs", snap, {}, { __dec: d }).then, "<b>6E</b> ▼ DOWN");
+});
+
+test("htr reply shows the hierarchy or says it is not there yet", () => {
+  const dec = { _htr: { GC: "<b>GC · ranges within ranges</b>\n<b>4h</b> range 3955 – 4157" } };
+  assert.match(htrReply(dec, "GC"), /ranges within ranges/);
+  assert.match(htrReply(dec, "GC"), /provisional/);
+  assert.match(htrReply(dec, "6E"), /No range hierarchy for 6E/);
 });

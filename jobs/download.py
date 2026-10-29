@@ -174,6 +174,15 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
             if first:
                 state["last_brief_day"] = local.strftime("%Y-%m-%d")
         if alerts:
+            try:                                   # ranges within ranges: touches, child ranges, facts, corrections
+                hmsg = hierarchy_alerts(now, dec, ltf, state)
+                if is_open(now):
+                    for m in hmsg[:6]:
+                        telegram.send(m, html=True)
+                    if len(hmsg) > 6:
+                        telegram.send(f"🧾 {len(hmsg) - 6} more range facts this hour — /htr 6E (any pair) shows the full hierarchy", html=True)
+            except Exception as e:
+                print(f"[hierarchy alerts error] {type(e).__name__}: {e}")
             state["decisions"] = {k: d["action"] if not k.endswith("m") or not d.get("strong") else d["action"] + " ✅"
                                   for k, d in dec.items() if not k.startswith("_")}
             state["watch"] = {k: f"{d['watch']['edge']}@{d['watch']['level']:.6g}" for k, d in dec.items()
@@ -191,6 +200,60 @@ def write_cards(now, health_ok: bool = True, send_photo=telegram.send_photo, kv=
     except Exception as e:   # cards must never break data collection
         print(f"[cards error] {type(e).__name__}: {e}")
         return None
+
+
+def hierarchy_alerts(now, dec: dict, ltf: dict | None, state: dict) -> list[str]:
+    """Messages for the range hierarchy since the last run (whs/hierarchy.py). Updates `state` in place.
+    The first run only records (no burst of alerts)."""
+    from whs import cards, hierarchy as hz
+    recs, atrs = cards.LAST_RECS, cards.LAST_ATRS
+    now = pd.Timestamp(now).tz_convert("UTC")
+    first = "htr_facts" not in state
+    since = pd.Timestamp(state.get("htr_since") or (now - pd.Timedelta(hours=1)).isoformat())
+    armed = state.get("htr_armed") or {}
+    msgs = []
+    lpath = DATA / "htr_log.json"
+    try:
+        log = json.loads(lpath.read_text()) if lpath.exists() else []
+    except Exception:
+        log = []
+    for key in sorted({k for k, _ in recs}):
+        b15 = (ltf or {}).get("15m", {}).get(key)
+        ts = hz.touches(key, recs, b15, since, atrs, armed)
+        if ts:
+            msgs.append(hz.touches_text(ts))
+            for t in ts:
+                c = hz.log_claim("touch", key, t["tf"], -t["side"], t["c"], t["target"], t["inv"], t["t"])
+                if c:
+                    log.append(c)
+    cur = hz.facts(recs)
+    live = {g["id"] for rec in recs.values() for g in (rec or {}).get("ranges") or []}
+    pending = {}
+    if not first:
+        new, corr, pending = hz.diff_facts(state["htr_facts"], cur, state.get("htr_pending") or {}, live)
+        msgs += [hz.correction_text(f) for f in corr]
+        msgs += [hz.fact_text(f, cur) for f in new if hz.alert_fact(f)]
+    seen = state.get("htr_children") or {}
+    for key, frames in (dec.get("_htr_frames") or {}).items():
+        changed = False
+        for fr in frames:
+            for ch in fr["children"]:
+                k, tag = f"{key}|{fr['tf']}|{ch['id']}", f"{ch['outcome']}|{ch['own_c']}|{ch['back_in']}"
+                if seen.get(k) != tag:
+                    seen[k], changed = tag, True
+                    px = float((dec.get(f"{key} {ch['tf']}") or {}).get("price") or 0)
+                    if ch["back_in"] and not first and px:
+                        c = hz.log_claim("child", key, fr["tf"], -ch["zone"], px, ch["target"], ch["inv"], now)
+                        if c:
+                            log.append(c)
+        if changed and not first:
+            msgs.append("🧩 " + dec["_htr"][key])
+    state.update(htr_since=now.isoformat(), htr_armed=armed, htr_facts=cur, htr_pending=pending,
+                 htr_children=dict(list(seen.items())[-400:]))
+    hz.score_claims(log, (ltf or {}).get("15m", {}))
+    lpath.write_text(json.dumps(log[-3000:], indent=0))
+    dec["_htr_claims"] = hz.claims_report(log)
+    return [] if first else msgs
 
 
 LTF = {"15m": (pd.Timedelta(minutes=15), 60), "5m": (pd.Timedelta(minutes=5), 25)}   # step, days kept

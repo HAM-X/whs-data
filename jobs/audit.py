@@ -96,6 +96,14 @@ def text(sc: dict, days: int, n_snap: int) -> str:
         o.append(f"• Phase-C setups: {len(sc['ent'])} · target {hit} · stopped {stp} · open {len(sc['ent']) - hit - stp}")
     else:
         o.append("• Phase-C setups: none this week")
+    try:
+        from whs import hierarchy as hz
+        lp = DATA / "htr_log.json"
+        if lp.exists():
+            o.append("<b>Ranges within ranges</b> (forward log since it went live)")
+            o.append(hz.claims_report(json.loads(lp.read_text())))
+    except Exception as e:
+        o.append(f"• range hierarchy log unreadable: {type(e).__name__}")
     o.append("<i>A coin scores 50 %. Two years of replay: decisions 48–51 %, flow 56 %. Numbers this week are noise "
              "unless they hold for months.</i>")
     return "\n".join(o)
