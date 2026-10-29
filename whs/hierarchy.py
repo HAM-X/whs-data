@@ -493,7 +493,7 @@ def story_text(key: str, rds: list[dict], price: float | None = None) -> str:
         why = cp.items_text(rd, 3)
         if why:
             lines.append(f"   {why}")
-    lines.append(f"▸ <b>Confirms</b> {struct['confirm']} ({TF_NAME[struct['tf']]})")
+    lines.append(f"▸ <b>Confirms ({TF_NAME[struct['tf']]})</b> {struct['confirm']}")
     if struct["side"] and struct["grade"] != "resolved":
         lines.append(f"▸ <b>Invalidates</b> {struct['invalid']}")
     lines.append(f"▸ <b>Watching next</b> {struct['watch']}")
