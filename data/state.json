@@ -21,7 +21,8 @@
   "USD|Advance GDP q/q|2026-10-29T12:30:00+00:00",
   "USD|Core PCE Price Index m/m|2026-10-29T12:30:00+00:00",
   "EUR|Main Refinancing Rate|2026-10-29T13:15:00+00:00",
-  "EUR|Monetary Policy Statement|2026-10-29T13:15:00+00:00"
+  "EUR|Monetary Policy Statement|2026-10-29T13:15:00+00:00",
+  "EUR|ECB Press Conference|2026-10-29T13:45:00+00:00"
  ],
  "decisions": {
   "6E 4h": "NO NEW ENTRIES",
