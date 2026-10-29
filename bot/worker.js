@@ -53,7 +53,9 @@ export function help() {
     "/chart 6E [1h] — the chart card: action, trigger, levels, who's in control",
     "/zoom 6E [5m] — the 15m / 5m structure read against the 4h / 1h range edges",
     "/vsa 6E [1h|15m|5m] — rallies, reactions and bars in VSA notation (V R D S)",
-    "/why 6E [1h] — the Wyckoff story: events, phases, bias",
+    "/story 6E — the campaign: accumulation or distribution, 1D → 15m, what confirms it, what kills it, what to watch, the count, the odds",
+    "/why 6E [1h] — the events, phases and bias of one chart",
+    "/htr 6E — ranges within ranges, 1D → 4h → 1h → 15m: the minor range at the edge, its phase C, what it points to",
     "/trend 6E [tf] — major trend, protected level, swing structure · /swings 6E [tf] — every swing in notation",
     "/effort 6E [tf] — effort vs result bar by bar · /read 6E [tf] — everything at once",
     "<b>Any pair, any timeframe (5m 15m 30m 1h 4h daily weekly), any mix — fresh in ≈1 min:</b>",
@@ -256,6 +258,16 @@ export const wantsScan = (text) => /^\/(scan|story|brief|panel|news)\b|\b(scan|s
 
 // ---------- Robot v2: answers built by the robot (data/decisions.json + card images in KV) ----------
 const tfOf = (a, dflt = "4h") => { const m = String(a || "").toLowerCase().match(/^(4h|1h|15m|5m)$/); return m ? m[1] : dflt; };
+export function htrReply(dec, k) {
+  const t = dec && dec._htr && dec._htr[k];
+  return t ? t + "\n\n<i>Facts only — B setups at best at an edge. Phase-C labels are provisional; corrections come as ✏️.</i>"
+           : `No range hierarchy for ${k} yet — the robot writes it every hour.`;
+}
+export function storyReply(dec, k) {
+  const t = dec && dec._story && dec._story[k];
+  return t ? t + "\n\n<i>The read is the course's logic, graded by effort. Odds come from where price sits; the replay credits the read with a few points on top. Facts, not entries.</i>"
+           : `No campaign story for ${k} yet — the robot writes it every hour.`;
+}
 export function todayReply(dec) {
   if (!dec || !dec._today) return "No board yet — the robot draws it every hour.";
   return { photo: "board", caption: dec._today };
@@ -353,10 +365,12 @@ export function route(text, snap, env = {}, sc = null) {
     });
     case "/zoom": case "/ltf": return need(sym(args[0]), (k) => zoomReply(dec, k, tfOf(args[1], "15m")));
     case "/vsa": case "/effort": return need(sym(args[0]), (k) => vsaReply(dec, k, tfOf(args[1])));
-    case "/why": case "/story": return need(sym(args[0]), (k) => whyReply(dec, k, tfOf(args[1])));
+    case "/why": return need(sym(args[0]), (k) => whyReply(dec, k, tfOf(args[1])));
+    case "/story": case "/campaign": return need(sym(args[0]), (k) => storyReply(dec, k));
     case "/trend": case "/swings": case "/read": case "/ask":
       return "This one is read fresh from the market — the bot needs its GitHub token for that (see /refresh).";
     case "/setups": case "/hitlist": return textOf(dec, "_setups", "No setups list yet — the robot writes it every hour.");
+    case "/htr": case "/ranges": case "/nested": return need(sym(args[0]), (k) => htrReply(dec, k));
     case "/dollar": case "/usd": case "/dx": return textOf(dec, "_dollar", "No dollar read yet.");
     case "/hourly": case "/update": case "/overview":
       return dec && dec._hourly ? { photo: "board", caption: dec._hourly.caption, then: dec._hourly.body }
@@ -417,7 +431,7 @@ async function loadScan(env) {
 // ---------- fresh answers: any pair, any timeframe, any analysis (robot-now → jobs/ask.py, ≈ 1 min) ----------
 const PRE_TF = ["4h", "1h", "15m", "5m"];                 // what the hourly robot precomputes
 const ANALYSIS = { "/chart": "chart", "/zoom": "chart", "/ltf": "chart", "/status": "chart", "/levels": "chart", "/vsa": "vsa",
-  "/why": "why", "/story": "why", "/effort": "effort", "/trend": "trend", "/swings": "swings", "/read": "all", "/ask": "" };
+  "/why": "why", "/effort": "effort", "/trend": "trend", "/swings": "swings", "/read": "all", "/ask": "" };
 export function tfIn(text) {
   const m = String(text).toLowerCase().match(/\b(5m|15m|30m|1h|60m|4h|1d|daily|day|1w|weekly|week)\b/);
   if (!m) return null;

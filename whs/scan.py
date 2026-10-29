@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from . import autorange, core, degrees, desk, ranges, story, swings
+from . import autorange, core, degrees, desk, ranges, story, swings, vsa
 from .config import EXCHANGE_TZ, FUTURES
 
 TF_MIN = {"1h": 60, "4h": 240, "15m": 15, "5m": 5, "30m": 30, "1d": 1440, "1w": 10080}
@@ -98,9 +98,23 @@ def read_one(d: pd.DataFrame, tf: str, htf_bars: pd.DataFrame | None, ctx: dict 
             "name": rr.name or f"{rr.bull_name} / {rr.bear_name}",
             "support": float(min(rr.support, rr.resistance)), "resistance": float(max(rr.support, rr.resistance)),
             "events": [(t.iloc[e.known].isoformat(), e.name, e.state, float(e.price)) for e in rr.events if not e.hidden],
+            # full event detail for the range hierarchy (whs/hierarchy.py): extreme bar, known bar, role, side
+            "ev2": [dict(b=t.iloc[e.bar].isoformat(), k=t.iloc[e.known].isoformat(), n=e.name, r=e.role, s=int(e.side),
+                         st=e.state, p=float(e.price), ef=None if np.isnan(e.effort) else round(float(e.effort), 2))
+                    for e in rr.events if not e.hidden],
             "alerts": [(t.iloc[b].isoformat(), txt) for b, txt in rr.alerts],
             "story": [f"#{k} {p}: {txt}" for k, p, txt in st.steps], "bias": st.bias,
         })
+    # the swings and the effort/result verdict the campaign read uses (same as the replay that measured it)
+    try:
+        vs = vsa.read(o, h, l, c, eff, led, n_swings=4, n_bars=3)
+        sws = [s for s in led.swings if s.confirm_i is not None and s.confirm_i <= n - 1][-6:]
+        out["sw"] = [dict(d=int(s.direction), sp=float(s.start_p), ep=float(s.end_p), bars=int(s.bars), eff=round(float(s.avg_effort), 3),
+                          code=x["code"]) for s, x in zip(sws[-len(vs["swings"]):] if vs["swings"] else [], vs["swings"])]
+        out["verdict"] = vs["verdict"]
+    except Exception as e:
+        print(f"[scan swings error] {tf}: {type(e).__name__}: {e}")
+        out["sw"], out["verdict"] = [], ""
     return out
 
 
