@@ -9,7 +9,7 @@
 "target": 0.70392498375,
 "inv": 0.7011550286409441,
 "chance": 0.215,
-"status": "open",
+"status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 },
 {
@@ -250,7 +250,7 @@
 "target": 0.70392498375,
 "inv": 0.7014316753065138,
 "chance": 0.208,
-"status": "open",
+"status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
 },
 {
