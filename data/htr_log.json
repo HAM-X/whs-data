@@ -24,5 +24,18 @@
 "chance": 0.044,
 "status": "open",
 "grade": "no supply \u2014 the test passed"
+},
+{
+"kind": "touch",
+"key": "6J",
+"tf": "15m",
+"side": -1,
+"t": "2026-10-30T00:30:00+00:00",
+"c": 0.006370000076,
+"target": 0.006353250006,
+"inv": 0.006373705040156551,
+"chance": 0.181,
+"status": "miss",
+"grade": "demand in control \u2014 wide bar on effort, closed on the high"
 }
 ]
