@@ -22,7 +22,7 @@
 "target": 4508.850097500001,
 "inv": 4004.7163623549013,
 "chance": 0.044,
-"status": "open",
+"status": "miss",
 "grade": "no supply \u2014 the test passed"
 },
 {
@@ -114,5 +114,21 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "C"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "1h",
+"side": 1,
+"t": "2026-10-30T05:12:00.933323+00:00",
+"c": 0.7170000076,
+"target": 0.7256749868500001,
+"inv": 0.69337499145,
+"chance": 0.731,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
