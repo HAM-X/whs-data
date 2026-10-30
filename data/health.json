@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-10-30T23:12:00.740153+00:00",
- "run_local": "Sat 31 Oct 02:12",
+ "run_utc": "2026-10-30T23:16:04.553663+00:00",
+ "run_local": "Sat 31 Oct 02:16",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -176,8 +176,8 @@
    "kind": "spot",
    "yahoo": "CAD=X",
    "bars": 12619,
-   "added": 1,
-   "revised": 117,
+   "added": 0,
+   "revised": 118,
    "first": "2024-10-16T23:00:00+00:00",
    "last": "2026-10-30T22:00:00+00:00",
    "last_local": "Sat 31 Oct 01:00",
