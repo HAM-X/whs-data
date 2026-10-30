@@ -130,5 +130,18 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "touch",
+"key": "6A",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-30T07:30:00+00:00",
+"c": 0.7016500235,
+"target": 0.70392498375,
+"inv": 0.7015487093218782,
+"chance": 0.043,
+"status": "open",
+"grade": "supply in control \u2014 wide bar on effort, closed on the low"
 }
 ]
