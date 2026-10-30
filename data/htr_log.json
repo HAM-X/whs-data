@@ -37,5 +37,50 @@
 "chance": 0.181,
 "status": "miss",
 "grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-10-30T01:15:00+00:00",
+"c": 0.5644500256,
+"target": 0.5632500052,
+"inv": 0.5647064070063982,
+"chance": 0.176,
+"status": "open",
+"grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "15m",
+"side": -1,
+"t": "2026-10-30T02:12:00.870793+00:00",
+"c": 0.7172999978,
+"target": 0.7098000050000001,
+"inv": 0.7197999954,
+"chance": 0.25,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "A"
+},
+{
+"kind": "campaign",
+"key": "6S",
+"tf": "1h",
+"side": -1,
+"t": "2026-10-30T02:12:00.870793+00:00",
+"c": 1.22360003,
+"target": 1.2164499160000002,
+"inv": 1.2318500879999998,
+"chance": 0.536,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "C"
 }
 ]
