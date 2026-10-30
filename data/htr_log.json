@@ -239,5 +239,31 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "touch",
+"key": "6A",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-30T13:30:00+00:00",
+"c": 0.7019500136,
+"target": 0.70392498375,
+"inv": 0.7014316753065138,
+"chance": 0.208,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "touch",
+"key": "6S",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-30T13:30:00+00:00",
+"c": 1.219900012,
+"target": 1.223375022,
+"inv": 1.2194790302051177,
+"chance": 0.108,
+"status": "miss",
+"grade": "supply in control \u2014 wide bar on effort, closed on the low"
 }
 ]
