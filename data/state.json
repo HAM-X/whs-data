@@ -36,7 +36,7 @@
   "6B 4h": "TREND \u2191",
   "6B 1h": "WAIT",
   "6B 15m": "TREND \u2191",
-  "6B 5m": "TREND \u2191",
+  "6B 5m": "TREND \u2193",
   "6A 4h": "SIDEWAYS",
   "6A 1h": "WAIT",
   "6A 15m": "WATCH",
@@ -59,13 +59,13 @@
   "6S 5m": "WAIT",
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2193",
-  "GC 15m": "SIDEWAYS",
-  "GC 5m": "SELL RALLIES"
+  "GC 15m": "TREND \u2193",
+  "GC 5m": "TREND \u2193"
  },
  "watch": {
   "6C 1h": "resistance@0.7176"
  },
- "htr_since": "2026-10-30T13:12:01.079711+00:00",
+ "htr_since": "2026-10-30T13:17:55.362801+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": true,
@@ -1002,29 +1002,29 @@
   },
   "6E|15m": {
    "id": "2026-10-29T13:15:00+00:00",
-   "label": "leaning ACCUMULATION",
-   "side": 1,
-   "grade": "lean",
+   "label": "BALANCED",
+   "side": 0,
+   "grade": "none",
    "S": 1.112400055,
    "R": 1.123450041,
-   "chance": 0.6640235562289423,
-   "inv": 1.1107425571,
+   "chance": 0.5757924037188893,
+   "inv": null,
    "phase": "A",
    "tf": "15m",
-   "tag": "2026-10-29T13:15:00+00:00|leaning ACCUMULATION"
+   "tag": "2026-10-29T13:15:00+00:00|BALANCED"
   },
   "6B|1h": {
    "id": "2026-10-14T15:00:00+00:00",
-   "label": "leaning DISTRIBUTION",
-   "side": -1,
-   "grade": "lean",
+   "label": "BALANCED",
+   "side": 0,
+   "grade": "none",
    "S": 1.31400001,
    "R": 1.342100024,
-   "chance": 0.76423511746293,
-   "inv": 1.3463150261,
+   "chance": 0.7215297828677228,
+   "inv": null,
    "phase": "A",
    "tf": "1h",
-   "tag": "2026-10-14T15:00:00+00:00|leaning DISTRIBUTION"
+   "tag": "2026-10-14T15:00:00+00:00|BALANCED"
   },
   "6A|1d": {
    "id": "2026-05-05T22:00:00+00:00",
@@ -1197,16 +1197,16 @@
   },
   "6S|15m": {
    "id": "2026-10-30T01:15:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "leaning ACCUMULATION",
+   "side": 1,
+   "grade": "lean",
    "S": 1.22025001,
    "R": 1.226500034,
-   "chance": 0.6219983315264037,
-   "inv": null,
+   "chance": 0.3700004191983951,
+   "inv": 1.2193125063999999,
    "phase": "B",
    "tf": "15m",
-   "tag": "2026-10-30T01:15:00+00:00|BALANCED"
+   "tag": "2026-10-30T01:15:00+00:00|leaning ACCUMULATION"
   },
   "GC|1d": {
    "id": "2026-03-22T22:00:00+00:00",
@@ -1222,12 +1222,7 @@
    "tag": "2026-03-22T22:00:00+00:00|leaning DISTRIBUTION"
   }
  },
- "camp_pend": {
-  "6E|15m": "2026-10-29T13:15:00+00:00|BALANCED",
-  "6B|1h": "2026-10-14T15:00:00+00:00|BALANCED",
-  "6A|15m": "2026-10-28T00:30:00+00:00|leaning ACCUMULATION",
-  "6S|15m": "2026-10-30T01:15:00+00:00|leaning ACCUMULATION"
- },
+ "camp_pend": {},
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
   "6C|1h|2026-10-14T14:00:00+00:00|confirm|1": "2026-10-30T10:12:01.287767+00:00"
