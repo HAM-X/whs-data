@@ -1,0 +1,28 @@
+[
+{
+"kind": "touch",
+"key": "6A",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-29T23:15:00+00:00",
+"c": 0.7017499804,
+"target": 0.70392498375,
+"inv": 0.7011550286409441,
+"chance": 0.215,
+"status": "open",
+"grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
+},
+{
+"kind": "touch",
+"key": "GC",
+"tf": "1d",
+"side": 1,
+"t": "2026-10-29T23:15:00+00:00",
+"c": 4026.899902,
+"target": 4508.850097500001,
+"inv": 4004.7163623549013,
+"chance": 0.044,
+"status": "open",
+"grade": "no supply \u2014 the test passed"
+}
+]
