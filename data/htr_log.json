@@ -281,5 +281,37 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "D"
+},
+{
+"kind": "campaign",
+"key": "6E",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-30T18:12:00.939295+00:00",
+"c": 1.1171,
+"target": 1.1289750339999998,
+"inv": 1.1068750619999999,
+"chance": 0.463,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "B"
+},
+{
+"kind": "campaign",
+"key": "6B",
+"tf": "15m",
+"side": 1,
+"t": "2026-10-30T18:12:00.939295+00:00",
+"c": 1.338700056,
+"target": 1.346350015,
+"inv": 1.3345499629999997,
+"chance": 0.352,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
