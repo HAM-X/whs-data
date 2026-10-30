@@ -265,5 +265,21 @@
 "chance": 0.108,
 "status": "miss",
 "grade": "supply in control \u2014 wide bar on effort, closed on the low"
+},
+{
+"kind": "campaign",
+"key": "6S",
+"tf": "15m",
+"side": -1,
+"t": "2026-10-30T17:12:00.777395+00:00",
+"c": 1.220450044,
+"target": 1.217124998,
+"inv": 1.2296250460000002,
+"chance": 0.734,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "D"
 }
 ]
