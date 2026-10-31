@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-10-31T02:12:01.514575+00:00",
- "run_local": "Sat 31 Oct 05:12",
+ "run_utc": "2026-10-31T03:12:01.427650+00:00",
+ "run_local": "Sat 31 Oct 06:12",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -105,7 +105,7 @@
    "yahoo": "DX-Y.NYB",
    "bars": 12172,
    "added": 0,
-   "revised": 113,
+   "revised": 96,
    "first": "2024-10-18T15:00:00+00:00",
    "last": "2026-10-30T20:00:00+00:00",
    "last_local": "Fri 30 Oct 23:00",
