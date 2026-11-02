@@ -750,7 +750,7 @@
 "target": 0.7174499929,
 "inv": 0.7161271608936026,
 "chance": 0.131,
-"status": "open",
+"status": "miss",
 "grade": "supply in control \u2014 wide bar on effort, closed on the low"
 },
 {
@@ -784,5 +784,37 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "campaign",
+"key": "6B",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-02T21:12:01.279953+00:00",
+"c": 1.341199994,
+"target": 1.3387499445,
+"inv": 1.3445499545000001,
+"chance": 0.578,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "D"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-02T21:12:01.279953+00:00",
+"c": 0.7160500288,
+"target": 0.7150500119000001,
+"inv": 0.7198499738999999,
+"chance": 0.792,
+"status": "open",
+"wick": true,
+"label": "DISTRIBUTION",
+"grade": "shown",
+"phase": "D"
 }
 ]
