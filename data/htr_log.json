@@ -356,7 +356,7 @@
 "target": 0.006350500275999999,
 "inv": 0.006406499772,
 "chance": 0.554,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
