@@ -707,5 +707,21 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "campaign",
+"key": "6J",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-02T18:12:00.580928+00:00",
+"c": 0.006357000209,
+"target": 0.0064139999455,
+"inv": 0.006327999755499999,
+"chance": 0.337,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
