@@ -880,5 +880,21 @@
 "label": "DISTRIBUTION",
 "grade": "shown",
 "phase": "D"
+},
+{
+"kind": "campaign",
+"key": "GC",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-03T05:12:01.289041+00:00",
+"c": 3939.800049,
+"target": 3930.6998285,
+"inv": 3997.5001224999996,
+"chance": 0.864,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "D"
 }
 ]
