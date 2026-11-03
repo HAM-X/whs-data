@@ -976,5 +976,18 @@
 "label": "DISTRIBUTION",
 "grade": "shown",
 "phase": "D"
+},
+{
+"kind": "touch",
+"key": "6C",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-03T13:45:00+00:00",
+"c": 0.716350019,
+"target": 0.7174499929,
+"inv": 0.716164260518899,
+"chance": 0.144,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
 }
 ]
