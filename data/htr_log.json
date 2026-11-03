@@ -987,7 +987,23 @@
 "target": 0.7174499929,
 "inv": 0.716164260518899,
 "chance": 0.144,
-"status": "open",
+"status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-03T15:12:01.108890+00:00",
+"c": 0.5627999902,
+"target": 0.5676249861,
+"inv": 0.5611249805,
+"chance": 0.258,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "D"
 }
 ]
