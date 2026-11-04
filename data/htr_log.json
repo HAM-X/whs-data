@@ -1061,7 +1061,7 @@
 "target": 4008.949951,
 "inv": 3899.949951,
 "chance": 0.41,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -1082,5 +1082,21 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "C"
+},
+{
+"kind": "campaign",
+"key": "6J",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-04T06:12:01.280849+00:00",
+"c": 0.006347499788,
+"target": 0.006402500439,
+"inv": 0.0062904995870000004,
+"chance": 0.509,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
