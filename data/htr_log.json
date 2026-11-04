@@ -1050,5 +1050,21 @@
 "chance": 0.119,
 "status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "campaign",
+"key": "GC",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-04T04:12:01.456242+00:00",
+"c": 3944.600098,
+"target": 4008.949951,
+"inv": 3899.949951,
+"chance": 0.41,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "B"
 }
 ]
