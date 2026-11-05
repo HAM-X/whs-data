@@ -60,6 +60,19 @@ def test_wave_counts_effort_and_travel_from_the_rbar():
             assert np.isclose(R["wave_dE"][y], E[j] / E[j - 2]) and np.isclose(R["wave_dR"][y], T[j] / T[j - 2])
             checked += 1
     assert checked >= 2
+    # cost = effort per ATR of travel vs the previous same-side wave's, only once the wave is 3+ bars and 0.5+ ATR
+    for i in range(fl[3], fl[-1]):
+        if np.isfinite(R["wave_cost"][i]):
+            assert R["wave_bars"][i] >= 3 and R["wave_travel"][i] >= 0.5
+            assert np.isclose(R["wave_cost"][i], R["wave_dE"][i] / R["wave_dR"][i])
+    assert r1.cost_band(1.3) == "dearer" and r1.cost_band(0.7) == "cheaper" and r1.cost_band(1.0) == "even" and r1.cost_band(np.nan) == "young"
+    # the last COMPLETED wave: frozen from the RBar that closes it until the next one
+    for j in range(2, len(E) - 1):
+        z = fl[j + 1]                                  # this RBar closes wave j
+        assert R["last_side"][z] == R["rbar"][fl[j]] and R["last_bars"][z] == fl[j + 1] - fl[j]
+        assert np.isclose(R["last_effort"][z], E[j]) and R["last_effort"][fl[j + 2] - 1] == R["last_effort"][z]
+        if E[j - 2] > 0 and T[j - 2] > 0:
+            assert np.isclose(R["last_dE"][z], E[j] / E[j - 2]) and np.isclose(R["last_dR"][z], T[j] / T[j - 2])
 
 
 def test_last_bar_reads_the_parent_from_closed_bars_only():
@@ -71,3 +84,4 @@ def test_last_bar_reads_the_parent_from_closed_bars_only():
     last_close = pd.Timestamp(out["bar"]) + pd.Timedelta(hours=1)
     assert pd.Timestamp(out["parent"]["bar"]) + pd.Timedelta(hours=4) <= last_close
     assert out["state"] in (1, -1) and out["sl"] is not None and out["wave"]["bars"] >= 1
+    assert out["last_wave"]["side"] == -out["state"] and out["last_wave"]["light"] in ("", "red", "green", "ease")

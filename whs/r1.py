@@ -6,12 +6,15 @@ bar     Roman's bar-by-bar template (WTC P1 S7): effort and vs the last bar · d
         same side · spread (TR ÷ ATR[1]) · close in the spread · close to close · intention (2 Up→Yes · 1 Up→No ·
         −1 Down→No · −2 Down→Yes · 0 inside bar).
 commit  the commitment line (whs/commit.py): state, SL, SBar steps since the flip.
-wave    the commitment's own waves: a wave runs from one RBar to the next. effort = Σ bar effort ("normal bars"),
-        travel = the wave's extreme beyond the RBar close ÷ ATR[1] at the RBar. Both compared with the previous wave of
-        the SAME side: dE, dR. Replay (5 Nov 2026, TV data, 7,664 1h waves): with the travel change and the duration
-        held equal, a wave that took ≥ 1.1× the effort of the last same-side wave was followed by a shorter next wave
-        on that side 4.4 points more often [90 %: +1.4, +8.7] (in-sample +2.5, hold-out +5.8). 4h: nothing beyond the
-        wave's duration.
+wave    the commitment's own waves: a wave runs from one RBar to the next (the RBar bar opens it, the next RBar closes it).
+        effort = Σ bar effort ("normal bars"), travel = the wave's extreme beyond the RBar close ÷ ATR[1] at the RBar,
+        cost = effort per ATR of travel. Compared with the last COMPLETED wave of the same side: dE, dR, cost ×
+        (cost × only once the wave is 3+ bars and 0.5+ ATR old — before that it is "young"). Cost is fair mid-wave
+        (both parts grow together); effort alone is not (a young wave always has "less effort").
+        Replay (5 Nov 2026, TV data, 7,628 1h + 2,159 4h waves, logistic regression): with the wave's travel and duration
+        (and the previous wave's) held, effort adds nothing to whether the next same-side wave travels less (1h: effort ×2
+        → +1.2 points, z 1.4; in-sample 0.0, hold-out +1.8 · 4h z 0.6) nor to the size of the reaction. A first, coarser
+        test (+4.4 points) was regression to the mean — corrected. → like bar effort, a measurement to read, not an edge.
 parent  the next timeframe's commitment (1h → 4h), read from its last CLOSED bar (no repainting).
 """
 from __future__ import annotations
@@ -29,6 +32,13 @@ def light(dE, dR) -> str:
     if dE is None or dR is None or not np.isfinite(dE) or not np.isfinite(dR):
         return ""
     return "red" if dE >= 1.1 and dR <= 0.9 else "green" if dE >= 1.1 and dR >= 1.1 else "ease" if dE <= 0.9 and dR >= 1.1 else ""
+
+
+def cost_band(x) -> str:
+    """The wave's cost (effort per ATR of travel) vs the last wave of its side: dearer ≥ 1.25 · cheaper ≤ 0.8."""
+    if x is None or not np.isfinite(x):
+        return "young"
+    return "dearer" if x >= 1.25 else "cheaper" if x <= 0.8 else "even"
 
 
 def reading(o, h, l, c, v, times: pd.Series, tf_minutes: int) -> dict:
@@ -65,14 +75,21 @@ def reading(o, h, l, c, v, times: pd.Series, tf_minutes: int) -> dict:
                       np.where(att == -1, np.where((c2c == -1) & (cp <= 0.5), -2, -1), 0))
     cm = commit.commitment(o, h, l, c)
     # waves: RBar → next RBar
-    wE, wR, wN, wdE, wdR = (np.full(n, np.nan) for _ in range(5))
+    wE, wR, wN, wdE, wdR, wC = (np.full(n, np.nan) for _ in range(6))
+    lS, lN, lE, lR, ldE, ldR = (np.full(n, np.nan) for _ in range(6))   # the last COMPLETED wave (what the replay tested)
     done = {1: None, -1: None}                     # last completed wave of each side: (E, R)
+    last = (np.nan,) * 6
     st, e, ext, c0, a0, k = 0, 0.0, np.nan, np.nan, np.nan, 0
     for i in range(n):
         if cm["rbar"][i] != 0:
             if st != 0 and k:
-                done[st] = (e, (ext - c0) * st / a0 if a0 > 0 else np.nan)
+                R_ = (ext - c0) * st / a0 if a0 > 0 else np.nan
+                p = done[st]
+                ok = p is not None and p[0] > 0 and np.isfinite(p[1]) and p[1] > 0
+                last = (st, k, e, R_, e / p[0] if ok else np.nan, R_ / p[1] if ok and np.isfinite(R_) else np.nan)
+                done[st] = (e, R_)
             st, e, ext, c0, a0, k = int(cm["rbar"][i]), 0.0, (h[i] if cm["rbar"][i] > 0 else l[i]), c[i], atr1[i], 0
+        lS[i], lN[i], lE[i], lR[i], ldE[i], ldR[i] = last
         if st == 0:
             continue
         k += 1
@@ -81,11 +98,14 @@ def reading(o, h, l, c, v, times: pd.Series, tf_minutes: int) -> dict:
         wE[i], wN[i] = e, k
         wR[i] = (ext - c0) * st / a0 if a0 > 0 else np.nan
         p = done[st]
-        if p and p[0] > 0 and p[1] and p[1] > 0:
+        if p and p[0] > 0 and np.isfinite(p[1]) and p[1] > 0:
             wdE[i], wdR[i] = e / p[0], wR[i] / p[1]
+            if k >= 3 and wR[i] >= 0.5:
+                wC[i] = (e / wR[i]) / (p[0] / p[1])
     return dict(effort=eff, rs=rs, cpos=cp, c2c=c2c, dEb=dEb, dRb=dRb, dSide=dSide, att=att, intent=intent, atr=atr,
                 state=cm["state"], line=cm["line"], step=cm["step"], rbar=cm["rbar"], sb=cm["sb"],
-                wave_effort=wE, wave_travel=wR, wave_bars=wN, wave_dE=wdE, wave_dR=wdR)
+                wave_effort=wE, wave_travel=wR, wave_bars=wN, wave_dE=wdE, wave_dR=wdR, wave_cost=wC,
+                last_side=lS, last_bars=lN, last_effort=lE, last_travel=lR, last_dE=ldE, last_dR=ldR)
 
 
 def _f(x, nd=2):
@@ -111,10 +131,14 @@ def last_bar(d: pd.DataFrame, tf_minutes: int = 60, parent: pd.DataFrame | None 
         "state": st, "sl": _f(ln, 6), "step": int(R["step"][i]),
         "since": t.iloc[int(flips[-1])].isoformat() if len(flips) else None,
         "sl_atr": _f(abs(c - ln) / a) if st and np.isfinite(ln) and a > 0 else None,
-        "wave": {"bars": int(R["wave_bars"][i]) if np.isfinite(R["wave_bars"][i]) else None,
+        "wave": {"bars": int(R["wave_bars"][i]) if np.isfinite(R["wave_bars"][i]) else None,     # the wave in progress, so far
                  "effort": _f(R["wave_effort"][i], 1), "travel": _f(R["wave_travel"][i]),
-                 "dE": _f(R["wave_dE"][i]), "dR": _f(R["wave_dR"][i]),
-                 "light": light(R["wave_dE"][i], R["wave_dR"][i])},
+                 "dE": _f(R["wave_dE"][i]), "dR": _f(R["wave_dR"][i]), "cost": _f(R["wave_cost"][i]),
+                 "cost_band": cost_band(R["wave_cost"][i])},
+        "last_wave": None if not np.isfinite(R["last_side"][i]) else {                              # the last completed wave
+                 "side": int(R["last_side"][i]), "bars": int(R["last_bars"][i]), "effort": _f(R["last_effort"][i], 1),
+                 "travel": _f(R["last_travel"][i]), "dE": _f(R["last_dE"][i]), "dR": _f(R["last_dR"][i]),
+                 "light": light(R["last_dE"][i], R["last_dR"][i])},
         "parent": None,
     }
     if parent is not None and len(parent) >= 30:
