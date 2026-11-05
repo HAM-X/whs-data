@@ -8,8 +8,8 @@ bar     Roman's bar-by-bar template (WTC P1 S7): effort and vs the last bar · d
 commit  the commitment line (whs/commit.py): state, SL, SBar steps since the flip.
 wave    the commitment's own waves: a wave runs from one RBar to the next (the RBar bar opens it, the next RBar closes it).
         effort = Σ bar effort ("normal bars"), travel = the wave's extreme beyond the RBar close ÷ ATR[1] at the RBar,
-        cost = effort per ATR of travel. Compared with the last COMPLETED wave of the same side: dE, dR, cost ×
-        (cost × only once the wave is 3+ bars and 0.5+ ATR old — before that it is "young"). Cost is fair mid-wave
+        cost = effort per ATR of travel. Compared with the last FULL completed wave of the same side (3+ bars, 0.5+ ATR —
+        a stub wave would make every ratio explode): dE, dR, cost × (cost × only once this wave is full too — "young" before). Cost is fair mid-wave
         (both parts grow together); effort alone is not (a young wave always has "less effort").
         Replay (5 Nov 2026, TV data, 7,628 1h + 2,159 4h waves, logistic regression): with the wave's travel and duration
         (and the previous wave's) held, effort adds nothing to whether the next same-side wave travels less (1h: effort ×2
@@ -24,6 +24,7 @@ import pandas as pd
 
 from . import commit, core
 
+FULL_BARS, FULL_ATR = 3, 0.5          # a full wave: 3+ bars and 0.5+ ATR of travel (stubs never become the reference)
 LIGHT = {"red": "more effort, less travel", "green": "more effort, more travel", "ease": "less effort, more travel"}
 
 
@@ -87,7 +88,8 @@ def reading(o, h, l, c, v, times: pd.Series, tf_minutes: int) -> dict:
                 p = done[st]
                 ok = p is not None and p[0] > 0 and np.isfinite(p[1]) and p[1] > 0
                 last = (st, k, e, R_, e / p[0] if ok else np.nan, R_ / p[1] if ok and np.isfinite(R_) else np.nan)
-                done[st] = (e, R_)
+                if k >= FULL_BARS and np.isfinite(R_) and R_ >= FULL_ATR:      # only a FULL wave becomes the reference
+                    done[st] = (e, R_)
             st, e, ext, c0, a0, k = int(cm["rbar"][i]), 0.0, (h[i] if cm["rbar"][i] > 0 else l[i]), c[i], atr1[i], 0
         lS[i], lN[i], lE[i], lR[i], ldE[i], ldR[i] = last
         if st == 0:
@@ -100,7 +102,7 @@ def reading(o, h, l, c, v, times: pd.Series, tf_minutes: int) -> dict:
         p = done[st]
         if p and p[0] > 0 and np.isfinite(p[1]) and p[1] > 0:
             wdE[i], wdR[i] = e / p[0], wR[i] / p[1]
-            if k >= 3 and wR[i] >= 0.5:
+            if k >= FULL_BARS and wR[i] >= FULL_ATR:
                 wC[i] = (e / wR[i]) / (p[0] / p[1])
     return dict(effort=eff, rs=rs, cpos=cp, c2c=c2c, dEb=dEb, dRb=dRb, dSide=dSide, att=att, intent=intent, atr=atr,
                 state=cm["state"], line=cm["line"], step=cm["step"], rbar=cm["rbar"], sb=cm["sb"],

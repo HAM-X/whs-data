@@ -49,15 +49,20 @@ def test_wave_counts_effort_and_travel_from_the_rbar():
     ext = d.high[a:b].max() if s > 0 else d.low[a:b].min()
     atr1 = R["atr"][a - 1]
     assert np.isclose(R["wave_travel"][b - 1], (ext - d.close[a]) * s / atr1)
-    # dE / dR: each wave vs the previous wave of the SAME side (waves alternate → two waves back)
+    # dE / dR: each wave vs the last FULL wave of the SAME side (3+ bars, 0.5+ ATR)
     E = [np.nansum(R["effort"][x:y]) for x, y in zip(fl[:-1], fl[1:])]
     T = [R["wave_travel"][y - 1] for y in fl[1:]]
+    N = [y - x for x, y in zip(fl[:-1], fl[1:])]
+    ref = lambda j: next((q for q in range(j - 2, -1, -2) if N[q] >= r1.FULL_BARS and T[q] >= r1.FULL_ATR and E[q] > 0), None)
     checked = 0
     for j in range(2, len(E)):
         y = fl[j + 1] - 1
         assert R["rbar"][fl[j]] == R["rbar"][fl[j - 2]]
-        if E[j - 2] > 0 and T[j - 2] > 0:
-            assert np.isclose(R["wave_dE"][y], E[j] / E[j - 2]) and np.isclose(R["wave_dR"][y], T[j] / T[j - 2])
+        q = ref(j)
+        if q is None:
+            assert np.isnan(R["wave_dE"][y])
+        else:
+            assert np.isclose(R["wave_dE"][y], E[j] / E[q]) and np.isclose(R["wave_dR"][y], T[j] / T[q])
             checked += 1
     assert checked >= 2
     # cost = effort per ATR of travel vs the previous same-side wave's, only once the wave is 3+ bars and 0.5+ ATR
@@ -71,8 +76,9 @@ def test_wave_counts_effort_and_travel_from_the_rbar():
         z = fl[j + 1]                                  # this RBar closes wave j
         assert R["last_side"][z] == R["rbar"][fl[j]] and R["last_bars"][z] == fl[j + 1] - fl[j]
         assert np.isclose(R["last_effort"][z], E[j]) and R["last_effort"][fl[j + 2] - 1] == R["last_effort"][z]
-        if E[j - 2] > 0 and T[j - 2] > 0:
-            assert np.isclose(R["last_dE"][z], E[j] / E[j - 2]) and np.isclose(R["last_dR"][z], T[j] / T[j - 2])
+        q = ref(j)
+        if q is not None:
+            assert np.isclose(R["last_dE"][z], E[j] / E[q]) and np.isclose(R["last_dR"][z], T[j] / T[q])
 
 
 def test_last_bar_reads_the_parent_from_closed_bars_only():
