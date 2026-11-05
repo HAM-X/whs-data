@@ -1,0 +1,28 @@
+name: mock-1m
+# One-off (branch mock-1m only): 1-minute 6E / GC bars from Yahoo for the WHS Flow design mock. Artifact kept 1 day; nothing committed.
+on:
+  push:
+    branches: [mock-1m]
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "yfinance>=1.7,<2"
+      - run: |
+          python - <<'PY'
+          import yfinance as yf
+          for s in ("6E=F", "GC=F"):
+              d = yf.Ticker(s).history(period="7d", interval="1m", auto_adjust=False, prepost=True)
+              d.to_csv(s.replace("=F", "") + "_1m.csv")
+              print(s, len(d), d.index.min(), d.index.max())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bars-1m
+          path: "*_1m.csv"
+          retention-days: 1
