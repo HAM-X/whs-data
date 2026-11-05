@@ -109,6 +109,16 @@ def manage_bars(d: pd.DataFrame, n: int = 72) -> dict:
             "e": f(e, 2), "sb": [int(x) for x in sb[k]], "rb": [int(x) for x in rb[k]], "atr": f(atr)}
 
 
+def _r1(h1: pd.DataFrame, h4: pd.DataFrame | None) -> dict | None:
+    """WHS R1 reading of the last closed 1h bar + the 4h commitment (whs/r1.py) — the journal tags every trade with it."""
+    from . import r1
+    try:
+        return r1.last_bar(h1.reset_index(drop=True), 60, h4, 240)
+    except Exception as e:          # the snapshot must never break on the reading
+        print(f"[r1 error] {type(e).__name__}: {e}")
+        return None
+
+
 def instrument(key: str, h1: pd.DataFrame, h4: pd.DataFrame | None, spot: pd.DataFrame | None, now) -> dict:
     if h1.empty:
         return {"key": key, "available": False}
@@ -178,6 +188,7 @@ def instrument(key: str, h1: pd.DataFrame, h4: pd.DataFrame | None, spot: pd.Dat
         "recent": [bar(x) for _, x in d.tail(6).iloc[::-1].iterrows()],
         "roll": roll_info(key, pd.Timestamp(now).tz_convert(EXCHANGE_TZ).date()),
         "bars1h": manage_bars(d),
+        "r1": _r1(h1, h4),
     }
     if key in MT5 and spot is not None and len(spot):
         sym, direction = MT5[key]

@@ -1,4 +1,5 @@
 import { deskRoute, DESK_CMDS, load as loadDesk, save as saveDesk, manage, guard, RISK } from "./desk.js";
+import { monthlyText, monthKey } from "./score.js";
 
 // Pipdon BOT — Telegram command bot on Cloudflare Workers (no AI; every answer is computed).
 // Reads the robot's hourly snapshot (data/snapshot.json in HAM-X/whs-data) and answers only Hamza's chat.
@@ -68,6 +69,7 @@ export function help() {
     "/open … · /trades · /close 6E [price] — the bot manages the stop hourly",
     "/account — can I trade, today, drawdown, open risk, last trades",
     "/journal — your closed trades: win rate, average R, last 10",
+    "/score — every trade is tagged with the R1 reading at entry: which reads pay, against chance · /tag spring names your setup",
     "/calls — the robot's own calls, scored live (Saturday report)",
     "",
     "<i>Plain words work too: \"euro\", \"gold vsa 15m\", \"why yen\", \"setups\", \"dollar\", \"any news\".</i>",
@@ -544,11 +546,28 @@ async function answer(env, chatId, out) {
   return reply(env, chatId, String(out));
 }
 
+// Telegram caps a message at 4096 characters and rejects HTML cut inside a tag → split on blank lines, then lines
+export function chunks(text, max = 3900) {
+  const out = [];
+  let cur = "";
+  for (const block of String(text).split(/(?<=\n\n)/)) {
+    const parts = block.length > max ? block.split(/(?<=\n)/) : [block];
+    for (const p of parts) {
+      if (cur.length + p.length > max && cur) { out.push(cur.trimEnd()); cur = ""; }
+      cur += p.length > max ? p.slice(0, max) : p;
+    }
+  }
+  if (cur.trim()) out.push(cur.trimEnd());
+  return out.length ? out : [""];
+}
+
 async function reply(env, chatId, text) {
-  const body = { chat_id: chatId, text: text.slice(0, 4000), parse_mode: "HTML", disable_web_page_preview: true };
-  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-  });
+  for (const part of chunks(text)) {
+    const body = { chat_id: chatId, text: part, parse_mode: "HTML", disable_web_page_preview: true };
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_TOKEN}/sendMessage`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+  }
 }
 
 // TradingView alert → Telegram (WHS Range / Engine alerts). The webhook URL carries a private key: /tv/<TV_KEY>
@@ -563,11 +582,24 @@ export function tvMessage(body) {
   return `${flag} <b>TradingView</b> · ${esc(t)}`;
 }
 
+// the monthly score: on the 1st (UTC+3) from 09:00, once — last month's trades, then every tag against chance
+async function monthly(env, now = Date.now()) {
+  if (!env.DESK) return;
+  const loc = new Date(now + 3 * 3600e3);
+  if (loc.getUTCDate() !== 1 || loc.getUTCHours() < 9) return;
+  const key = monthKey(now);
+  if ((await env.DESK.get("score:month")) === key) return;
+  const st = await loadDesk(env);
+  await env.DESK.put("score:month", key);
+  if (st && st.journal && st.journal.length) await reply(env, env.TELEGRAM_CHAT_ID, monthlyText(st.journal, now));
+}
+
 export default {
   // hourly, after the robot's hh:12 run has committed fresh bars: manage open trades
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
       try { await deadman(env); } catch (e) { /* never let the watchdog break trade management */ }
+      try { await monthly(env); } catch (e) { /* the report never blocks trade management */ }
       const st = await loadDesk(env);
       if (!st || !st.trades.length) return;
       const lines = manage(st, await loadSnapshot(env));
