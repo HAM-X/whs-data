@@ -1,6 +1,7 @@
 // Pipdon BOT · Trade Desk in the bot: Manage (open trades, hourly checks) and Guard (prop / own limits).
 // State lives in Cloudflare KV (binding DESK, key "desk") — private, never in the public repo.
 // Everything is in % of the account and in R, so it works for any account size (prop or live).
+import { entryTags, tagsLine, blendedR, scoreText } from "./score.js";
 
 export const RISK = { A: 0.5, B: 0.25, C: 0.125 };     // % of balance (settled 18 Oct 2026)
 export const OWN = { day: 2.5, ddHalf: 6, ddStop: 8, heat: 1.5, theme: 0.75, lossesDay: 2, streak: 4 };
@@ -103,13 +104,17 @@ export function pipOffset(inst) {
 }
 
 export function openTrade(st, snap, args, now = Date.now(), panel = null) {
-  const [k, dir, e, s, g] = args;
+  const [k, dir, e, s, g0, ...rest] = args;
+  // grade then an optional setup word: "/open 6E long 1.0909 1.0889 B spring" · the grade may be left out: "… 1.0889 spring"
+  const isGrade = (x) => x != null && (RISK[String(x).toUpperCase()] != null || isFinite(parseFloat(x)));
+  const g = isGrade(g0) ? g0 : "B";
+  const setup = (isGrade(g0) ? rest : [g0, ...rest]).filter(Boolean).join(" ") || null;
   const inst = snap.instruments[k];
   if (!inst) return "Which instrument?";
   const side = /^(long|buy|l)$/i.test(dir) ? 1 : /^(short|sell|s)$/i.test(dir) ? -1 : 0;
   const entry = parseFloat(e), stop = parseFloat(s);
   if (!side || !isFinite(entry) || !isFinite(stop) || (entry - stop) * side <= 0)
-    return "Usage: /open 6E long 1.0909 1.0889 B — future prices; stop below a long's entry, above a short's.";
+    return "Usage: /open 6E long 1.0909 1.0889 B [setup] — future prices; stop below a long's entry, above a short's. The setup word is yours (spring, test, lps…): /score groups by it.";
   const grade = String(g || "B").toUpperCase();
   const risk = RISK[grade] ?? parseFloat(grade);
   if (!isFinite(risk) || risk <= 0) return "Grade A, B, C or a risk % like 0.25.";
@@ -118,12 +123,23 @@ export function openTrade(st, snap, args, now = Date.now(), panel = null) {
   if (gd.state === "BLOCKED") return guardText(st, risk, now, pctx) + "\n⛔ Not opened.";
   const R = Math.abs(entry - stop);
   const t = { id: now, key: k, side, entry, stop0: stop, stop, R, grade, risk: risk * gd.factor, opened: new Date(now).toISOString(),
-              lastDone: null, third: false, be: false, best: 0, bars: 0, timeWarned: false };
+              lastDone: null, third: false, be: false, best: 0, bars: 0, timeWarned: false,
+              tags: entryTags(snap, k, side, now, setup, grade) };
   st.trades.push(t);
   return `📒 <b>Opened ${k} ${side === 1 ? "LONG" : "SHORT"}</b> ${p6(entry)} · stop ${p6(stop)} · 1R = ${p6(R)} · grade ${grade} ${t.risk}%\n` +
     `Plan: ⅓ off at 2R ${p6(entry + 2 * side * R)} · ADAPTIVE stop: each SBar commitment → its true-range ${side === 1 ? "low" : "high"}, ` +
     `after +1R a climactic bar → ½ of it · reversal bar against → exit · 48 bars without +1R → time stop.\n` +
-    (gd.state === "REDUCE" ? "🟠 " + gd.why.join(" · ") + "\n" : "") + guardText(st, 0, now, panel ? { rho: panel.themes?.rho } : {});
+    (gd.state === "REDUCE" ? "🟠 " + gd.why.join(" · ") + "\n" : "") + tagsLine(t.tags, side) + "\n" +
+    guardText(st, 0, now, panel ? { rho: panel.themes?.rho } : {});
+}
+
+// one journal row per closed trade: R with the ⅓ at 2R counted, the best R reached, the R1 tags at entry
+export function logClose(st, t, rExit, closed, now = Date.now()) {
+  const r = Math.round(blendedR(t.third, rExit) * 100) / 100;
+  st.journal.push({ key: t.key, side: t.side, r, rx: Math.round(rExit * 100) / 100, best: Math.round((t.best || 0) * 100) / 100,
+                    third: !!t.third, risk: t.risk, grade: t.grade, day: localDay(now), opened: t.opened, closed, tags: t.tags || null });
+  st.journal = st.journal.slice(-MAX_JOURNAL);
+  return r;
 }
 
 export function closeTrade(st, snap, args, now = Date.now()) {
@@ -132,11 +148,10 @@ export function closeTrade(st, snap, args, now = Date.now()) {
   if (i < 0) return `No open ${k} trade.`;
   const t = st.trades[i];
   const px = isFinite(parseFloat(args[1])) ? parseFloat(args[1]) : snap.instruments[k]?.price;
-  const r = rNow(t, px);
+  if (!isFinite(px)) return `No price for ${k} — /close ${k} 1.0950`;
   st.trades.splice(i, 1);
-  st.journal.push({ key: k, side: t.side, r: Math.round(r * 100) / 100, risk: t.risk, day: localDay(now), closed: new Date(now).toISOString() });
-  st.journal = st.journal.slice(-MAX_JOURNAL);
-  return `📕 Closed ${k} at ${p6(px)} · ${fx(r)}R (${fx(r * t.risk)}% of the account)\n` + guardText(st, 0, now);
+  const r = logClose(st, t, rNow(t, px), new Date(now).toISOString(), now);
+  return `📕 Closed ${k} at ${p6(px)} · ${fx(r)}R${t.third ? " (⅓ at 2R counted)" : ""} (${fx(r * t.risk)}% of the account) · best ${fx(t.best)}R\n` + guardText(st, 0, now);
 }
 
 export function tradesText(st, snap) {
@@ -165,10 +180,9 @@ export function manage(st, snap, now = Date.now()) {
       const tag = `${t.key} ${side === 1 ? "long" : "short"}`;
       // 1) stop hit
       if ((side === 1 && lo <= t.stop) || (side === -1 && hi >= t.stop)) {
-        const r = rNow(t, t.stop);
-        out.push(`🛑 ${tag}: stop ${p6(t.stop)} hit (${b.t[i].slice(11, 16)} UTC) · ${fx(r)}R. Logged — /close is not needed.`);
         st.trades = st.trades.filter((x) => x !== t);
-        st.journal.push({ key: t.key, side, r: Math.round(r * 100) / 100, risk: t.risk, day: localDay(now), closed: b.t[i] });
+        const r = logClose(st, t, rNow(t, t.stop), b.t[i], now);
+        out.push(`🛑 ${tag}: stop ${p6(t.stop)} hit (${b.t[i].slice(11, 16)} UTC) · ${fx(r)}R${t.third ? " (⅓ at 2R counted)" : ""}. Logged — /close is not needed.`);
         break;
       }
       const fav = side === 1 ? hi : lo;
@@ -250,6 +264,17 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
       return `Firm limits set: daily −${d}% · max drawdown −${m}%.`;
     }
     case "/journal": return journalText(st);
+    case "/score": return scoreText(st.journal);
+    case "/tag": {
+      // /tag spring → the newest open trade (else the last closed one) · /tag 6E spring → that instrument's open trade
+      let k = snap.instruments[args[0]] ? args[0] : null;
+      const word = (k ? args.slice(1) : args).join(" ").toLowerCase().slice(0, 24);
+      if (!word) return "Usage: /tag spring — names the setup of your newest trade (/tag 6E test for a specific open trade). /score groups by it.";
+      const t = k ? st.trades.find((x) => x.key === k) : st.trades[st.trades.length - 1] || st.journal[st.journal.length - 1];
+      if (!t) return "No trade to tag yet.";
+      t.tags = { ...(t.tags || {}), setup: word };
+      return `🏷 ${t.key} ${t.side === 1 ? "long" : "short"} tagged “${word}”${t.closed ? " (closed trade)" : ""}.`;
+    }
     case "/account": {
       const sub = String(args[0] || "").toLowerCase();
       if (["pnl", "dd", "limits"].includes(sub)) {
@@ -268,7 +293,7 @@ export function deskRoute(cmd, args, st, snap, now = Date.now(), panel = null) {
   }
   return null;
 }
-export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard", "/account", "/plan", "/journal"];
+export const DESK_CMDS = ["/open", "/close", "/trades", "/stop", "/pnl", "/dd", "/limits", "/guard", "/account", "/plan", "/journal", "/score", "/tag"];
 
 // /journal — what your closed trades say: last 10, win rate, average R, total, best and worst
 export function journalText(st) {

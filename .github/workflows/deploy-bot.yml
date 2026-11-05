@@ -48,7 +48,7 @@ jobs:
 
       - name: Test the bot
         if: steps.check.outputs.skip != 'true'
-        run: node --test bot/worker.test.mjs bot/desk.test.mjs
+        run: node --test bot/worker.test.mjs bot/desk.test.mjs bot/score.test.mjs
 
       - name: Trade Desk storage (Cloudflare KV, created once)
         if: steps.check.outputs.skip != 'true'
@@ -125,6 +125,8 @@ jobs:
             {"command":"close","description":"Close a trade — /close 6E [price]"},
             {"command":"account","description":"Can I trade? Today, drawdown, open risk"},
             {"command":"journal","description":"Closed trades: win rate, average R, last 10"},
+            {"command":"score","description":"Which reads pay: trades by the R1 reading at entry, vs chance"},
+            {"command":"tag","description":"Name the setup of your newest trade, e.g. /tag spring"},
             {"command":"calls","description":"The robot calls, scored live"},
             {"command":"help","description":"What Pipdon BOT does"}]}' > /dev/null
           curl -sS "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
