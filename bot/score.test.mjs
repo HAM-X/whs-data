@@ -26,6 +26,7 @@ test("entry tags read R1 relative to the trade's side", () => {
   assert.equal(S.with1h, "against"); assert.equal(S.with4h, "with"); assert.equal(S.intent, "against"); assert.equal(S.step, "none");
   assert.equal(S.wave, "their wave dearer");
   assert.equal(entryTags(snapOf({ wave: { bars: 2 } }), "6E", 1, T0).wave, "young");
+  assert.equal(entryTags(snapOf({ step: 0 }), "6E", 1, T0).step, "0");                 // just flipped: RBar, no SBar yet
   assert.equal(entryTags({ instruments: { "6E": {} } }, "6E", 1, T0).r1, false);
   assert.equal(entryTags(snapOf(), "6E", 1, T0 + 10 * 3600e3).stale, true);
 });

@@ -35,7 +35,7 @@ export function entryTags(snap, key, side, now = Date.now(), setup = null, grade
   tags.eff = r.band || "n/a";
   tags.effX = r.effort;
   tags.intent = it === 2 ? "yes" : it === 1 ? "failed" : it < 0 ? "against" : "inside";
-  tags.step = r.state === side ? (r.step >= 3 ? "3+" : String(Math.max(1, r.step))) : "none";
+  tags.step = r.state === side ? (r.step >= 3 ? "3+" : r.step === 0 ? "0" : String(r.step)) : "none";   // 0 = RBar, no SBar yet
   // the wave in progress: its cost (effort per ATR of travel) vs the last wave of the same side — dearer / even / cheaper,
   // "young" before 3 bars and 0.5 ATR. Relative to the trade: is the wave running your way or against you?
   const wb = r.wave?.cost_band || "young";
@@ -51,7 +51,7 @@ export function tagsLine(tg, side) {
   const arrow = (w) => (w === "with" ? "with you" : w === "against" ? "against you" : "none");
   const it = { yes: "tried your way → Yes", failed: "tried your way → No", against: "tried against you", inside: "inside bar" }[tg.intent];
   const t = new Date(Date.parse(tg.bar) + 3 * 3600e3).toISOString().slice(11, 16);
-  return `🏷 <b>R1 at entry</b> (${t} bar): 1h commitment ${arrow(tg.with1h)}${tg.step !== "none" ? ` · SBar ${tg.step}` : ""} · 4h ${arrow(tg.with4h)} · ` +
+  return `🏷 <b>R1 at entry</b> (${t} bar): 1h commitment ${arrow(tg.with1h)}${tg.step === "0" ? " · RBar, no SBar yet" : tg.step !== "none" ? ` · SBar ${tg.step}` : ""} · 4h ${arrow(tg.with4h)} · ` +
     `effort ${tg.effX != null ? tg.effX.toFixed(2) + "× " : ""}${tg.eff} · ${it} · ${tg.wave === "young" ? "wave young" : tg.wave + (tg.waveCost != null ? " (cost " + tg.waveCost.toFixed(2) + "×)" : "")}` +
     `${tg.setup ? ` · setup “${tg.setup}”` : ""} · ${tg.session}${tg.stale ? " · ⚠️ reading is old (market was closed?)" : ""}`;
 }
@@ -93,7 +93,7 @@ export const DIMS = [
   ["with4h", "With the 4h commitment", (j) => j.tags?.r1 ? j.tags.with4h : null],
   ["both", "1h and 4h together", (j) => (j.tags?.r1 ? (j.tags.with1h === "with" && j.tags.with4h === "with" ? "both with you"
     : j.tags.with1h === "with" || j.tags.with4h === "with" ? "one with you" : "neither") : null)],
-  ["step", "SBar step of the 1h commitment", (j) => j.tags?.r1 ? (j.tags.step === "none" ? "not with you" : "SBar " + j.tags.step) : null],
+  ["step", "SBar step of the 1h commitment", (j) => j.tags?.r1 ? (j.tags.step === "none" ? "not with you" : j.tags.step === "0" ? "RBar, no SBar yet" : "SBar " + j.tags.step) : null],
   ["eff", "Entry bar effort", (j) => j.tags?.r1 ? j.tags.eff : null],
   ["intent", "Entry bar intention", (j) => j.tags?.r1 ? { yes: "your way → Yes", failed: "your way → No", against: "against you", inside: "inside bar" }[j.tags.intent] : null],
   ["wave", "Wave cost at entry (effort per ATR vs the last wave of its side)", (j) => (j.tags?.r1 ? j.tags.wave : null)],
@@ -102,7 +102,7 @@ export const DIMS = [
   ["key", "Instrument", (j) => j.key],
 ];
 const ORDER = { "≫": 0, ">": 1, "≈": 2, "<": 3, "≪": 4, with: 0, against: 1, none: 2, "both with you": 0, "one with you": 1, neither: 2,
-  "SBar 1": 0, "SBar 2": 1, "SBar 3+": 2, "not with you": 3, "your wave cheaper": 0, "your wave even": 1, "your wave dearer": 2,
+  "RBar, no SBar yet": -1, "SBar 1": 0, "SBar 2": 1, "SBar 3+": 2, "not with you": 3, "your wave cheaper": 0, "your wave even": 1, "your wave dearer": 2,
   "their wave cheaper": 3, "their wave even": 4, "their wave dearer": 5, young: 6,
   Asia: 0, London: 1, "New York": 2, late: 3, A: 0, B: 1, C: 2,
   "your way → Yes": 0, "your way → No": 1, "against you": 2, "inside bar": 3 };
