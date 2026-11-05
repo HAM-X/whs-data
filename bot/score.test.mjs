@@ -7,7 +7,7 @@ import { chunks } from "./worker.js";
 const T0 = Date.parse("2026-11-05T12:30:00Z");            // Thu 15:30 UTC+3 = 06:30 CT → London
 const r1 = (o = {}) => ({ bar: "2026-11-05T11:00:00+00:00", tf: "1h", effort: 1.62, band: "≫", eff_vs_prev: 1.3, side_vs_prev: 1.4, spread: 1.4,
   close_pct: 82, c2c: 1, intent: 2, sb: 1, rb: 0, state: 1, sl: 1.1590, step: 2, since: "2026-11-04T20:00:00+00:00", sl_atr: 1.2,
-  wave: { bars: 9, effort: 12.3, travel: 2.1, dE: 1.35, dR: 0.72, light: "red" }, parent: { tf: "4h", state: -1, sl: 1.1650, step: 1 }, ...o });
+  wave: { bars: 4, effort: 3.1, travel: 0.6, dE: 0.3, dR: 0.2, cost: 1.5, cost_band: "dearer" }, last_wave: { side: -1, bars: 11, effort: 14.2, travel: 1.4, dE: 1.35, dR: 0.72, light: "red" }, parent: { tf: "4h", state: -1, sl: 1.1650, step: 1 }, ...o });
 const snapOf = (o) => ({ instruments: { "6E": { key: "6E", tick: 0.00005, price: 1.1620, mt5: { pip: 0.0001, spot: 1.162 }, bars1h: null, r1: r1(o) } } });
 
 test("sessions on the Chicago clock", () => {
@@ -21,9 +21,11 @@ test("sessions on the Chicago clock", () => {
 test("entry tags read R1 relative to the trade's side", () => {
   const L = entryTags(snapOf(), "6E", 1, T0, "Spring", "A");
   assert.equal(L.with1h, "with"); assert.equal(L.with4h, "against"); assert.equal(L.intent, "yes");
-  assert.equal(L.step, "2"); assert.equal(L.wave, "more"); assert.equal(L.eff, "≫"); assert.equal(L.setup, "spring"); assert.equal(L.stale, false);
+  assert.equal(L.step, "2"); assert.equal(L.wave, "your wave dearer"); assert.equal(L.eff, "≫"); assert.equal(L.setup, "spring"); assert.equal(L.stale, false);
   const S = entryTags(snapOf(), "6E", -1, T0);
   assert.equal(S.with1h, "against"); assert.equal(S.with4h, "with"); assert.equal(S.intent, "against"); assert.equal(S.step, "none");
+  assert.equal(S.wave, "their wave dearer");
+  assert.equal(entryTags(snapOf({ wave: { bars: 2 } }), "6E", 1, T0).wave, "young");
   assert.equal(entryTags({ instruments: { "6E": {} } }, "6E", 1, T0).r1, false);
   assert.equal(entryTags(snapOf(), "6E", 1, T0 + 10 * 3600e3).stale, true);
 });
