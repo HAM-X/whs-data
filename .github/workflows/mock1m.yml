@@ -45,6 +45,10 @@ jobs:
                               lo=round(lo, 6), row=row, b=[round(x) for x in buy], s=[round(x) for x in sell], m=len(g)))
           blob = base64.b64encode(zlib.compress(json.dumps(out, separators=(",", ":")).encode(), 9)).decode()
           print("bars", len(out), "chars", len(blob))
-          for k in range(0, len(blob), 60000):
-              print(f"::notice title=fp{k // 60000}::" + blob[k:k + 60000])
+          open("blob.txt", "w").write(blob)
           PY
+      - run: python -c "b=open('blob.txt').read(); [print(f'::notice title=fp{k}::'+b[k*4000:(k+1)*4000]) for k in range(0, 10) if b[k*4000:]]"
+      - run: python -c "b=open('blob.txt').read(); [print(f'::notice title=fp{k}::'+b[k*4000:(k+1)*4000]) for k in range(10, 20) if b[k*4000:]]"
+      - run: python -c "b=open('blob.txt').read(); [print(f'::notice title=fp{k}::'+b[k*4000:(k+1)*4000]) for k in range(20, 30) if b[k*4000:]]"
+      - run: python -c "b=open('blob.txt').read(); [print(f'::notice title=fp{k}::'+b[k*4000:(k+1)*4000]) for k in range(30, 40) if b[k*4000:]]"
+      - run: python -c "b=open('blob.txt').read(); [print(f'::notice title=fp{k}::'+b[k*4000:(k+1)*4000]) for k in range(40, 50) if b[k*4000:]]"
