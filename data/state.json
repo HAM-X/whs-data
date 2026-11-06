@@ -60,10 +60,10 @@
   "6A 1h": "TREND \u2193",
   "6A 15m": "SIDEWAYS",
   "6A 5m": "WAIT",
-  "6N 4h": "NO NEW ENTRIES",
-  "6N 1h": "NO NEW ENTRIES",
-  "6N 15m": "NO NEW ENTRIES",
-  "6N 5m": "NO NEW ENTRIES",
+  "6N 4h": "TREND \u2193",
+  "6N 1h": "TREND \u2193",
+  "6N 15m": "WAIT",
+  "6N 5m": "WAIT",
   "6J 4h": "WAIT",
   "6J 1h": "TREND \u2193",
   "6J 15m": "WAIT",
@@ -84,7 +84,7 @@
  "watch": {
   "6J 4h": "support@0.0063225"
  },
- "htr_since": "2026-11-06T22:16:40.784708+00:00",
+ "htr_since": "2026-11-06T23:12:01.188640+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
