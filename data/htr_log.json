@@ -1301,7 +1301,7 @@
 "target": 0.5703750252500001,
 "inv": 0.5550749898499999,
 "chance": 0.717,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
