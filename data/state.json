@@ -38,7 +38,12 @@
   "GBP|Monetary Policy Summary|2026-11-05T12:00:00+00:00",
   "GBP|MPC Official Bank Rate Votes|2026-11-05T12:00:00+00:00",
   "GBP|Official Bank Rate|2026-11-05T12:00:00+00:00",
-  "GBP|BOE Gov Bailey Speaks|2026-11-05T12:30:00+00:00"
+  "GBP|BOE Gov Bailey Speaks|2026-11-05T12:30:00+00:00",
+  "CAD|Employment Change|2026-11-06T13:30:00+00:00",
+  "CAD|Unemployment Rate|2026-11-06T13:30:00+00:00",
+  "USD|Average Hourly Earnings m/m|2026-11-06T13:30:00+00:00",
+  "USD|Non-Farm Employment Change|2026-11-06T13:30:00+00:00",
+  "USD|Unemployment Rate|2026-11-06T13:30:00+00:00"
  ],
  "decisions": {
   "6E 4h": "WAIT",
@@ -68,16 +73,16 @@
   "6S 4h": "TREND \u2191",
   "6S 1h": "WAIT",
   "6S 15m": "WAIT",
-  "6S 5m": "WAIT",
+  "6S 5m": "SIDEWAYS",
   "GC 4h": "WAIT",
-  "GC 1h": "TREND \u2193",
+  "GC 1h": "TREND \u2191",
   "GC 15m": "TREND \u2193",
-  "GC 5m": "TREND \u2193"
+  "GC 5m": "TREND \u2191"
  },
  "watch": {
   "6S 1h": "support@1.2269"
  },
- "htr_since": "2026-11-06T12:12:01.507883+00:00",
+ "htr_since": "2026-11-06T12:15:37.717666+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
