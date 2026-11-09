@@ -75,14 +75,14 @@
   "6S 4h": "WATCH",
   "6S 1h": "WAIT",
   "6S 15m": "TREND \u2191",
-  "6S 5m": "WAIT",
+  "6S 5m": "BUY ZONE \u2705",
   "GC 4h": "WAIT",
   "GC 1h": "TREND \u2191",
   "GC 15m": "WAIT",
   "GC 5m": "SIDEWAYS"
  },
  "watch": {},
- "htr_since": "2026-11-09T15:12:00.605192+00:00",
+ "htr_since": "2026-11-09T15:17:54.923746+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -906,16 +906,16 @@
   },
   "6S|1h": {
    "id": "2026-10-22T07:00:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "leaning DISTRIBUTION",
+   "side": -1,
+   "grade": "lean",
    "S": 1.220299959,
    "R": 1.228000045,
-   "chance": 0.646103303261816,
-   "inv": null,
+   "chance": 0.3636346399248037,
+   "inv": 1.236199975,
    "phase": "C",
    "tf": "1h",
-   "tag": "2026-10-22T07:00:00+00:00|BALANCED"
+   "tag": "2026-10-22T07:00:00+00:00|leaning DISTRIBUTION"
   },
   "GC|1d": {
    "id": "2026-03-22T22:00:00+00:00",
@@ -958,7 +958,7 @@
   }
  },
  "camp_pend": {
-  "6S|1h": "2026-10-22T07:00:00+00:00|leaning DISTRIBUTION"
+  "GC|15m": "2026-11-06T13:30:00+00:00|BALANCED"
  },
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
