@@ -79,12 +79,12 @@
   "GC 4h": "WAIT",
   "GC 1h": "TREND \u2191",
   "GC 15m": "WAIT",
-  "GC 5m": "TREND \u2191"
+  "GC 5m": "TREND \u2193"
  },
  "watch": {
   "GC 4h": "resistance@4157.7"
  },
- "htr_since": "2026-11-10T01:12:01.323626+00:00",
+ "htr_since": "2026-11-10T01:15:48.379334+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -871,16 +871,16 @@
   },
   "6C|15m": {
    "id": "2026-11-06T20:30:00+00:00",
-   "label": "leaning ACCUMULATION",
-   "side": 1,
-   "grade": "lean",
+   "label": "BALANCED",
+   "side": 0,
+   "grade": "none",
    "S": 0.7084000111,
    "R": 0.7114499807,
-   "chance": 0.397537618079866,
-   "inv": 0.70794251566,
+   "chance": 0.35655657026878035,
+   "inv": null,
    "phase": "B",
    "tf": "15m",
-   "tag": "2026-11-06T20:30:00+00:00|leaning ACCUMULATION"
+   "tag": "2026-11-06T20:30:00+00:00|BALANCED"
   },
   "6S|4h": {
    "id": "2026-10-22T06:00:00+00:00",
@@ -936,22 +936,19 @@
   },
   "GC|15m": {
    "id": "2026-11-06T13:30:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "leaning ACCUMULATION",
+   "side": 1,
+   "grade": "lean",
    "S": 4035.100098,
    "R": 4157.700195,
-   "chance": 0.711662387591746,
-   "inv": null,
+   "chance": 0.6468178100217974,
+   "inv": 4016.7100834499997,
    "phase": "A",
    "tf": "15m",
-   "tag": "2026-11-06T13:30:00+00:00|BALANCED"
+   "tag": "2026-11-06T13:30:00+00:00|leaning ACCUMULATION"
   }
  },
- "camp_pend": {
-  "6C|15m": "2026-11-06T20:30:00+00:00|BALANCED",
-  "GC|15m": "2026-11-06T13:30:00+00:00|leaning ACCUMULATION"
- },
+ "camp_pend": {},
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
   "6C|1h|2026-10-14T14:00:00+00:00|confirm|1": "2026-10-30T10:12:01.287767+00:00",
