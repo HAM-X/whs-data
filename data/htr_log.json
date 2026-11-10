@@ -1863,5 +1863,34 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "touch",
+"key": "6C",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-10T09:45:00+00:00",
+"c": 0.7084000111,
+"target": 0.7099249959,
+"inv": 0.7081804116628901,
+"chance": 0.126,
+"status": "open",
+"grade": "no supply \u2014 the test passed"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "1h",
+"side": 1,
+"t": "2026-11-10T10:12:00.787615+00:00",
+"c": 0.5637999773,
+"target": 0.5717499852499999,
+"inv": 0.54734998945,
+"chance": 0.674,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
