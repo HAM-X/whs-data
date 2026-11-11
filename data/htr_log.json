@@ -1966,5 +1966,21 @@
 "chance": 0.112,
 "status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "campaign",
+"key": "6E",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-11T07:16:36.321522+00:00",
+"c": 1.1171,
+"target": 1.1105749599999999,
+"inv": 1.132075072,
+"chance": 0.697,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "A"
 }
 ]
