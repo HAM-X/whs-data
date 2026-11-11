@@ -1919,7 +1919,7 @@
 "target": 1.1105749599999999,
 "inv": 1.132075072,
 "chance": 0.662,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -1935,7 +1935,7 @@
 "target": 4096.4001465,
 "inv": 4032.2199243550713,
 "chance": 0.194,
-"status": "open",
+"status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 },
 {
@@ -1977,7 +1977,7 @@
 "target": 1.1105749599999999,
 "inv": 1.132075072,
 "chance": 0.697,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
