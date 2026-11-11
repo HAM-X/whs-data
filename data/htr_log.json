@@ -1937,5 +1937,21 @@
 "chance": 0.194,
 "status": "open",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
+},
+{
+"kind": "campaign",
+"key": "6B",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-11T04:12:00.822238+00:00",
+"c": 1.334499955,
+"target": 1.3336500520000003,
+"inv": 1.336250008,
+"chance": 0.673,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "A"
 }
 ]
