@@ -68,7 +68,7 @@
   "6J 4h": "TREND \u2193",
   "6J 1h": "TREND \u2193",
   "6J 15m": "TREND \u2193",
-  "6J 5m": "WAIT",
+  "6J 5m": "TREND \u2191",
   "6C 4h": "TREND \u2193",
   "6C 1h": "TREND \u2193",
   "6C 15m": "TREND \u2193",
@@ -80,12 +80,12 @@
   "GC 4h": "WAIT",
   "GC 1h": "TREND \u2193",
   "GC 15m": "WAIT",
-  "GC 5m": "WAIT"
+  "GC 5m": "TREND \u2191"
  },
  "watch": {
   "6E 4h": "support@1.11415"
  },
- "htr_since": "2026-11-11T22:16:52.835047+00:00",
+ "htr_since": "2026-11-11T23:12:00.698805+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
