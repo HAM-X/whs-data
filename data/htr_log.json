@@ -2046,5 +2046,21 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "D"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-12T02:12:00.911187+00:00",
+"c": 0.5570499897,
+"target": 0.5516249836,
+"inv": 0.5703249872,
+"chance": 0.71,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "A"
 }
 ]
