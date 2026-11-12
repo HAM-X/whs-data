@@ -2062,5 +2062,21 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "campaign",
+"key": "GC",
+"tf": "1d",
+"side": -1,
+"t": "2026-11-12T15:12:01.233267+00:00",
+"c": 3874.300049,
+"target": 3691.1499025,
+"inv": 5326.5502925,
+"chance": 0.888,
+"status": "open",
+"wick": true,
+"label": "DISTRIBUTION",
+"grade": "shown",
+"phase": "D"
 }
 ]
