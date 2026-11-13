@@ -125,7 +125,7 @@
 "target": 0.7256749868500001,
 "inv": 0.69337499145,
 "chance": 0.731,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -2126,5 +2126,21 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "C"
+},
+{
+"kind": "campaign",
+"key": "GC",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-13T17:12:00.768363+00:00",
+"c": 3883.100098,
+"target": 3821.449951,
+"inv": 3962.449951,
+"chance": 0.563,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "B"
 }
 ]
