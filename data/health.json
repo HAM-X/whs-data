@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-11-14T10:12:00.793087+00:00",
- "run_local": "Sat 14 Nov 13:12",
+ "run_utc": "2026-11-14T10:18:08.423890+00:00",
+ "run_local": "Sat 14 Nov 13:18",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -57,7 +57,7 @@
    "yahoo": "6J=F",
    "bars": 11900,
    "added": 0,
-   "revised": 1,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-13T21:00:00+00:00",
    "last_local": "Sat 14 Nov 00:00",
@@ -69,7 +69,7 @@
    "yahoo": "6C=F",
    "bars": 11904,
    "added": 0,
-   "revised": 1,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-13T21:00:00+00:00",
    "last_local": "Sat 14 Nov 00:00",
