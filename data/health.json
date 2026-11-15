@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-11-15T22:12:00.863309+00:00",
- "run_local": "Mon 16 Nov 01:12",
+ "run_utc": "2026-11-15T23:12:00.586300+00:00",
+ "run_local": "Mon 16 Nov 02:12",
  "backfill": false,
  "problems": [],
  "symbols": {
@@ -103,12 +103,12 @@
   "DX": {
    "kind": "future",
    "yahoo": "DX-Y.NYB",
-   "bars": 12410,
-   "added": 0,
+   "bars": 12411,
+   "added": 1,
    "revised": 89,
    "first": "2024-10-18T15:00:00+00:00",
-   "last": "2026-11-13T21:00:00+00:00",
-   "last_local": "Sat 14 Nov 00:00",
+   "last": "2026-11-15T22:00:00+00:00",
+   "last_local": "Mon 16 Nov 01:00",
    "error": null,
    "status": "ok"
   },
