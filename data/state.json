@@ -1,6 +1,6 @@
 {
  "problems": {
-  "ALL:gaps": "8 of 9 futures missing hours at once \u2014 exchange holiday or Yahoo outage"
+  "GC:gaps": "GC: 1 missing hour(s) in the last day"
  },
  "last_ok_day": "2026-11-16",
  "last_brief_day": "2026-11-16",
@@ -91,7 +91,7 @@
   "6N 1h": "support@0.55345",
   "GC 4h": "support@3879.3"
  },
- "htr_since": "2026-11-16T07:12:01.388700+00:00",
+ "htr_since": "2026-11-16T07:15:46.929855+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -642,6 +642,16 @@
    "name": "ST",
    "price": 3871.100098,
    "bar": "2026-11-13T16:00:00+00:00",
+   "side": 1
+  },
+  "GC|15m|2026-11-12T15:15:00+00:00|B_heavy|1|2026-11-16T05": {
+   "key": "GC",
+   "tf": "15m",
+   "rid": "2026-11-12T15:15:00+00:00",
+   "fam": "B_heavy",
+   "name": "mSOW",
+   "price": 3835.199951,
+   "bar": "2026-11-16T05:45:00+00:00",
    "side": 1
   },
   "GC|1d|2026-03-22T22:00:00+00:00|SC|0|2026-03-22T22": {
