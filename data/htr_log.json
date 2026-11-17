@@ -2315,5 +2315,73 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "touch",
+"key": "6C",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-17T15:15:00+00:00",
+"c": 0.700150013,
+"target": 0.70034998655,
+"inv": 0.6997102151628225,
+"chance": 0.687,
+"status": "hit",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "touch",
+"key": "6C",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-17T15:30:00+00:00",
+"c": 0.7006499767,
+"target": 0.70034998655,
+"inv": 0.7009398092371775,
+"chance": 0.491,
+"status": "open",
+"grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-17T15:30:00+00:00",
+"c": 0.550549984,
+"target": 0.5501250029,
+"inv": 0.5509158567725544,
+"chance": 0.463,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "touch",
+"key": "GC",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-17T15:30:00+00:00",
+"c": 3886.600098,
+"target": 3863.9000244999997,
+"inv": 3896.8145523579005,
+"chance": 0.31,
+"status": "open",
+"grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-17T16:12:01.108479+00:00",
+"c": 0.5504999757,
+"target": 0.5489749908999999,
+"inv": 0.5512750149000001,
+"chance": 0.337,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "B"
 }
 ]
