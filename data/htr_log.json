@@ -1474,7 +1474,7 @@
 "target": 4294.049682999999,
 "inv": 3741.050171,
 "chance": 0.574,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -2185,7 +2185,7 @@
 "target": 3740.0999759999995,
 "inv": 4296.900268,
 "chance": 0.781,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -2572,5 +2572,18 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "C"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "1h",
+"side": 1,
+"t": "2026-11-18T16:15:00+00:00",
+"c": 0.5490499735,
+"target": 0.5500999986999999,
+"inv": 0.5488234812349394,
+"chance": 0.177,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
 }
 ]
