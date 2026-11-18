@@ -582,8 +582,8 @@
 "target": 1.320299983,
 "status": "open",
 "r": -0.05,
-"best": 0.0,
-"held": 0,
+"best": 0.61,
+"held": 12,
 "inv": 1.314399958,
 "shadow": true
 }
