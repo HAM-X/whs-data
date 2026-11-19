@@ -2815,7 +2815,7 @@
 "target": 0.5500999986999999,
 "inv": 0.5516214069930001,
 "chance": 0.704,
-"status": "open",
+"status": "hit",
 "grade": "undecided \u2014 neither a clean test nor a break"
 },
 {
@@ -2833,5 +2833,18 @@
 "label": "DISTRIBUTION",
 "grade": "shown",
 "phase": "D"
+},
+{
+"kind": "touch",
+"key": "6J",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-19T17:15:00+00:00",
+"c": 0.006269500125,
+"target": 0.0062682500575,
+"inv": 0.00627644821099347,
+"chance": 0.848,
+"status": "hit",
+"grade": "absorption \u2014 heavy effort, closed off the high (supply stopping it)"
 }
 ]
