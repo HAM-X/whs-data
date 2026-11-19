@@ -599,11 +599,12 @@
 "entry": 0.006276499946,
 "stop": 0.006275647221069319,
 "target": 0.0063184998,
-"status": "open",
-"r": 2.3,
-"best": 4.69,
-"held": 13,
+"status": "closed",
+"r": -1.05,
+"best": 0.0,
+"held": 1,
 "inv": 0.006275999825,
-"shadow": true
+"shadow": true,
+"closed": "2026-11-19T04:05:00+00:00"
 }
 ]
