@@ -2802,7 +2802,36 @@
 "target": 1.1007749439999999,
 "inv": 1.0988809782665696,
 "chance": 0.406,
-"status": "open",
+"status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "1h",
+"side": -1,
+"t": "2026-11-19T16:45:00+00:00",
+"c": 0.550549984,
+"target": 0.5500999986999999,
+"inv": 0.5516214069930001,
+"chance": 0.704,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "campaign",
+"key": "6E",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-19T17:12:00.925458+00:00",
+"c": 1.099099994,
+"target": 1.098224938,
+"inv": 1.1033249500000002,
+"chance": 0.828,
+"status": "open",
+"wick": true,
+"label": "DISTRIBUTION",
+"grade": "shown",
+"phase": "D"
 }
 ]
