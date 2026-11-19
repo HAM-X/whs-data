@@ -2749,5 +2749,47 @@
 "label": "leaning ACCUMULATION",
 "grade": "lean",
 "phase": "A"
+},
+{
+"kind": "touch",
+"key": "6B",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-19T14:45:00+00:00",
+"c": 1.314200044,
+"target": 1.315899968,
+"inv": 1.3136012984076797,
+"chance": 0.26,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "touch",
+"key": "6S",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-19T14:45:00+00:00",
+"c": 1.188949943,
+"target": 1.1902499794999999,
+"inv": 1.1884831892488636,
+"chance": 0.264,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "campaign",
+"key": "6B",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-19T15:12:00.679158+00:00",
+"c": 1.314200044,
+"target": 1.31309998,
+"inv": 1.3186999560000001,
+"chance": 0.804,
+"status": "open",
+"wick": true,
+"label": "DISTRIBUTION",
+"grade": "shown",
+"phase": "D"
 }
 ]
