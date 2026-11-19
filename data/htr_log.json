@@ -2073,7 +2073,7 @@
 "target": 3691.1499025,
 "inv": 5326.5502925,
 "chance": 0.888,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "DISTRIBUTION",
 "grade": "shown",
@@ -2760,7 +2760,7 @@
 "target": 1.315899968,
 "inv": 1.3136012984076797,
 "chance": 0.26,
-"status": "open",
+"status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
 },
 {
@@ -2786,10 +2786,23 @@
 "target": 1.31309998,
 "inv": 1.3186999560000001,
 "chance": 0.804,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "DISTRIBUTION",
 "grade": "shown",
 "phase": "D"
+},
+{
+"kind": "touch",
+"key": "6E",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-19T15:30:00+00:00",
+"c": 1.099650025,
+"target": 1.1007749439999999,
+"inv": 1.0988809782665696,
+"chance": 0.406,
+"status": "open",
+"grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 }
 ]
