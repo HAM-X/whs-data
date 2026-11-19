@@ -2846,5 +2846,21 @@
 "chance": 0.848,
 "status": "hit",
 "grade": "absorption \u2014 heavy effort, closed off the high (supply stopping it)"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-19T19:12:00.497679+00:00",
+"c": 0.5501000285,
+"target": 0.5461499691,
+"inv": 0.5563499927,
+"chance": 0.613,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "B"
 }
 ]
