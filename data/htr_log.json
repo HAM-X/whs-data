@@ -2675,5 +2675,18 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "1h",
+"side": -1,
+"t": "2026-11-19T08:15:00+00:00",
+"c": 0.5514500141,
+"target": 0.5500999986999999,
+"inv": 0.5517497102538156,
+"chance": 0.182,
+"status": "miss",
+"grade": "demand in control \u2014 wide bar on effort, closed on the high"
 }
 ]
