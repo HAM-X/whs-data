@@ -2699,7 +2699,7 @@
 "target": 1.351249993,
 "inv": 1.314031477521255,
 "chance": 0.08,
-"status": "open",
+"status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 },
 {
@@ -2744,7 +2744,7 @@
 "target": 1.1921500565,
 "inv": 1.1883499025000002,
 "chance": 0.711,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -2773,7 +2773,7 @@
 "target": 1.1902499794999999,
 "inv": 1.1884831892488636,
 "chance": 0.264,
-"status": "open",
+"status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
 },
 {
