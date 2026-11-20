@@ -76,7 +76,7 @@
   "GC 5m": "WAIT"
  },
  "watch": {},
- "htr_since": "2026-11-20T11:12:01.115403+00:00",
+ "htr_since": "2026-11-20T11:17:55.166294+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -1092,16 +1092,16 @@
   },
   "6A|1d": {
    "id": "2026-05-05T22:00:00+00:00",
-   "label": "leaning DISTRIBUTION",
+   "label": "MARKDOWN under way (phase E)",
    "side": -1,
-   "grade": "lean",
+   "grade": "resolved",
    "S": 0.6855499744,
    "R": 0.7271999717,
-   "chance": 0.006903191924096025,
-   "inv": 0.733447471295,
-   "phase": "D",
+   "chance": null,
+   "inv": null,
+   "phase": "E",
    "tf": "1d",
-   "tag": "2026-05-05T22:00:00+00:00|leaning DISTRIBUTION"
+   "tag": "2026-05-05T22:00:00+00:00|MARKDOWN under way (phase E)"
   },
   "6A|15m": {
    "id": "2026-11-20T03:00:00+00:00",
@@ -1131,16 +1131,16 @@
   },
   "6N|1h": {
    "id": "2026-11-17T16:00:00+00:00",
-   "label": "leaning DISTRIBUTION",
+   "label": "DISTRIBUTION",
    "side": -1,
-   "grade": "lean",
+   "grade": "shown",
    "S": 0.5489500165,
    "R": 0.5512499809,
-   "chance": 0.5652227486651553,
+   "chance": 0.445648789172564,
    "inv": 0.5537999868,
    "phase": "C",
    "tf": "1h",
-   "tag": "2026-11-17T16:00:00+00:00|leaning DISTRIBUTION"
+   "tag": "2026-11-17T16:00:00+00:00|DISTRIBUTION"
   },
   "6N|15m": {
    "id": "2026-11-19T03:00:00+00:00",
@@ -1247,10 +1247,7 @@
    "tag": "2026-03-22T22:00:00+00:00|MARKDOWN under way (phase E)"
   }
  },
- "camp_pend": {
-  "6A|1d": "2026-05-05T22:00:00+00:00|MARKDOWN under way (phase E)",
-  "6N|1h": "2026-11-17T16:00:00+00:00|DISTRIBUTION"
- },
+ "camp_pend": {},
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
   "6C|1h|2026-10-14T14:00:00+00:00|confirm|1": "2026-10-30T10:12:01.287767+00:00",
