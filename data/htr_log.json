@@ -2975,5 +2975,34 @@
 "chance": 0.19,
 "status": "hit",
 "grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "touch",
+"key": "6S",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-20T08:45:00+00:00",
+"c": 1.189350009,
+"target": 1.1902499794999999,
+"inv": 1.1890257612093977,
+"chance": 0.265,
+"status": "open",
+"grade": "supply in control \u2014 wide bar on effort, closed on the low"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-20T09:12:01.495384+00:00",
+"c": 0.550549984,
+"target": 0.5563499927,
+"inv": 0.5461499691,
+"chance": 0.431,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "B"
 }
 ]
