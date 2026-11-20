@@ -3137,7 +3137,7 @@
 "target": 0.66245001555,
 "inv": 0.6696500181499999,
 "chance": 0.75,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -3166,7 +3166,7 @@
 "target": 0.5500999986999999,
 "inv": 0.5486352960575567,
 "chance": 0.351,
-"status": "open",
+"status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 }
 ]
