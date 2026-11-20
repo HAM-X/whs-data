@@ -76,7 +76,7 @@
   "GC 5m": "WAIT"
  },
  "watch": {},
- "htr_since": "2026-11-20T21:12:01.135572+00:00",
+ "htr_since": "2026-11-20T21:18:39.667773+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -995,38 +995,7 @@
    "side": -1
   }
  },
- "htr_pending": {
-  "6B|15m|2026-11-20T07:00:00+00:00|B_heavy|1|2026-11-20T17": {
-   "key": "6B",
-   "tf": "15m",
-   "rid": "2026-11-20T07:00:00+00:00",
-   "fam": "B_heavy",
-   "name": "mSOW",
-   "price": 1.309800029,
-   "bar": "2026-11-20T17:00:00+00:00",
-   "side": 1
-  },
-  "6N|1h|2026-11-17T16:00:00+00:00|B_heavy|1|2026-11-19T21": {
-   "key": "6N",
-   "tf": "1h",
-   "rid": "2026-11-17T16:00:00+00:00",
-   "fam": "B_heavy",
-   "name": "mSOW",
-   "price": 0.5484499931,
-   "bar": "2026-11-19T21:00:00+00:00",
-   "side": 1
-  },
-  "6N|15m|2026-11-19T03:00:00+00:00|B_heavy|1|2026-11-20T18": {
-   "key": "6N",
-   "tf": "15m",
-   "rid": "2026-11-19T03:00:00+00:00",
-   "fam": "B_heavy",
-   "name": "mSOW",
-   "price": 0.5478500128,
-   "bar": "2026-11-20T18:45:00+00:00",
-   "side": 1
-  }
- },
+ "htr_pending": {},
  "camp": {
   "6E|4h": {
    "id": "2026-10-14T14:00:00+00:00",
@@ -1043,16 +1012,16 @@
   },
   "6B|15m": {
    "id": "2026-11-20T07:00:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "MARKDOWN under way (phase E)",
+   "side": -1,
+   "grade": "resolved",
    "S": 1.309900045,
    "R": 1.31219995,
-   "chance": 0.010845991464855737,
+   "chance": null,
    "inv": null,
-   "phase": "D",
+   "phase": "E",
    "tf": "15m",
-   "tag": "2026-11-20T07:00:00+00:00|BALANCED"
+   "tag": "2026-11-20T07:00:00+00:00|MARKDOWN under way (phase E)"
   },
   "6A|1d": {
    "id": "2026-05-05T22:00:00+00:00",
@@ -1095,29 +1064,29 @@
   },
   "6N|1h": {
    "id": "2026-11-17T16:00:00+00:00",
-   "label": "DISTRIBUTION",
+   "label": "MARKDOWN under way (phase E)",
    "side": -1,
-   "grade": "shown",
+   "grade": "resolved",
    "S": 0.5489500165,
    "R": 0.5512499809,
-   "chance": 0.021736597314302275,
-   "inv": 0.5537999868,
-   "phase": "D",
+   "chance": null,
+   "inv": null,
+   "phase": "E",
    "tf": "1h",
-   "tag": "2026-11-17T16:00:00+00:00|DISTRIBUTION"
+   "tag": "2026-11-17T16:00:00+00:00|MARKDOWN under way (phase E)"
   },
   "6N|15m": {
    "id": "2026-11-19T03:00:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "DISTRIBUTION",
+   "side": -1,
+   "grade": "shown",
    "S": 0.548699975,
    "R": 0.5537999868,
-   "chance": 0.20588682755596394,
-   "inv": null,
+   "chance": 0.07843251460712644,
+   "inv": 0.5545649885699999,
    "phase": "D",
    "tf": "15m",
-   "tag": "2026-11-19T03:00:00+00:00|BALANCED"
+   "tag": "2026-11-19T03:00:00+00:00|DISTRIBUTION"
   },
   "6J|1d": {
    "id": "2026-07-22T22:00:00+00:00",
@@ -1147,29 +1116,29 @@
   },
   "6C|1h": {
    "id": "2026-11-19T03:00:00+00:00",
-   "label": "leaning ACCUMULATION",
-   "side": 1,
-   "grade": "lean",
+   "label": "BALANCED",
+   "side": 0,
+   "grade": "none",
    "S": 0.6973000169,
    "R": 0.700699985,
-   "chance": 0.43382069525887135,
-   "inv": 0.696790021685,
+   "chance": 0.301470850564754,
+   "inv": null,
    "phase": "B",
    "tf": "1h",
-   "tag": "2026-11-19T03:00:00+00:00|leaning ACCUMULATION"
+   "tag": "2026-11-19T03:00:00+00:00|BALANCED"
   },
   "6C|15m": {
    "id": "2026-11-19T03:15:00+00:00",
-   "label": "leaning DISTRIBUTION",
-   "side": -1,
-   "grade": "lean",
+   "label": "BALANCED",
+   "side": 0,
+   "grade": "none",
    "S": 0.6973000169,
    "R": 0.700699985,
-   "chance": 0.43382069525887135,
-   "inv": 0.7012099802149999,
+   "chance": 0.301470850564754,
+   "inv": null,
    "phase": "B",
    "tf": "15m",
-   "tag": "2026-11-19T03:15:00+00:00|leaning DISTRIBUTION"
+   "tag": "2026-11-19T03:15:00+00:00|BALANCED"
   },
   "6S|4h": {
    "id": "2026-10-22T06:00:00+00:00",
@@ -1186,16 +1155,16 @@
   },
   "6S|15m": {
    "id": "2026-11-20T00:00:00+00:00",
-   "label": "BALANCED",
-   "side": 0,
-   "grade": "none",
+   "label": "leaning ACCUMULATION",
+   "side": 1,
+   "grade": "lean",
    "S": 1.187399983,
    "R": 1.196949959,
-   "chance": 0.6688501101992359,
-   "inv": null,
+   "chance": 0.5981668959168125,
+   "inv": 1.1859674865999998,
    "phase": "A",
    "tf": "15m",
-   "tag": "2026-11-20T00:00:00+00:00|BALANCED"
+   "tag": "2026-11-20T00:00:00+00:00|leaning ACCUMULATION"
   },
   "GC|1d": {
    "id": "2026-03-22T22:00:00+00:00",
@@ -1224,14 +1193,7 @@
    "tag": "2026-11-20T05:15:00+00:00|BALANCED"
   }
  },
- "camp_pend": {
-  "6B|15m": "2026-11-20T07:00:00+00:00|MARKDOWN under way (phase E)",
-  "6N|1h": "2026-11-17T16:00:00+00:00|MARKDOWN under way (phase E)",
-  "6N|15m": "2026-11-19T03:00:00+00:00|DISTRIBUTION",
-  "6C|1h": "2026-11-19T03:00:00+00:00|BALANCED",
-  "6C|15m": "2026-11-19T03:15:00+00:00|BALANCED",
-  "6S|15m": "2026-11-20T00:00:00+00:00|leaning ACCUMULATION"
- },
+ "camp_pend": {},
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
   "6C|1h|2026-10-14T14:00:00+00:00|confirm|1": "2026-10-30T10:12:01.287767+00:00",
