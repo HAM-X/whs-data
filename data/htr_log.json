@@ -3142,5 +3142,31 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "touch",
+"key": "6B",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-20T16:30:00+00:00",
+"c": 1.310799956,
+"target": 1.3110499975,
+"inv": 1.3095751286390371,
+"chance": 0.83,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
+},
+{
+"kind": "touch",
+"key": "6N",
+"tf": "1h",
+"side": 1,
+"t": "2026-11-20T16:30:00+00:00",
+"c": 0.5491499901,
+"target": 0.5500999986999999,
+"inv": 0.5486352960575567,
+"chance": 0.351,
+"status": "open",
+"grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
 }
 ]
