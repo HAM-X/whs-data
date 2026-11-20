@@ -2944,7 +2944,7 @@
 "target": 1.1883499025000002,
 "inv": 1.1921500565,
 "chance": 0.434,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -2960,7 +2960,7 @@
 "target": 0.5500999986999999,
 "inv": 0.5517239298308971,
 "chance": 0.199,
-"status": "open",
+"status": "hit",
 "grade": "demand in control \u2014 wide bar on effort, closed on the high"
 },
 {
