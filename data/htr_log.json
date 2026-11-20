@@ -1458,7 +1458,7 @@
 "target": 0.66472497575,
 "inv": 0.7480249703499999,
 "chance": 0.664,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -2899,7 +2899,7 @@
 "target": 0.5500999986999999,
 "inv": 0.5485265662884541,
 "chance": 0.301,
-"status": "open",
+"status": "miss",
 "grade": "undecided \u2014 neither a clean test nor a break"
 }
 ]
