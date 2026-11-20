@@ -70,15 +70,15 @@
   "6C 5m": "WAIT",
   "6S 4h": "TREND \u2193",
   "6S 1h": "TREND \u2193",
-  "6S 15m": "SELL ZONE",
+  "6S 15m": "WAIT",
   "6S 5m": "TREND \u2191",
   "GC 4h": "TREND \u2193",
   "GC 1h": "TREND \u2193",
-  "GC 15m": "TREND \u2193",
-  "GC 5m": "TREND \u2193"
+  "GC 15m": "TREND \u2191",
+  "GC 5m": "TREND \u2191"
  },
  "watch": {},
- "htr_since": "2026-11-20T06:12:01.513845+00:00",
+ "htr_since": "2026-11-20T06:18:02.640595+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -1289,7 +1289,7 @@
    "R": 0.6715000272,
    "chance": 0.3070212625085204,
    "inv": 0.67235503497,
-   "phase": "D",
+   "phase": "B",
    "tf": "15m",
    "tag": "2026-11-19T03:00:00+00:00|leaning DISTRIBUTION"
   },
