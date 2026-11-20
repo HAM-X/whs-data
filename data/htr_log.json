@@ -2912,7 +2912,7 @@
 "target": 0.5478000343,
 "inv": 0.5523999631000001,
 "chance": 0.717,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -3015,7 +3015,7 @@
 "target": 0.5478000343,
 "inv": 0.5523999631000001,
 "chance": 0.554,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "DISTRIBUTION",
 "grade": "shown",
@@ -3057,7 +3057,7 @@
 "target": 1.3087500925,
 "inv": 1.3133499024999997,
 "chance": 0.467,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -3168,5 +3168,21 @@
 "chance": 0.351,
 "status": "miss",
 "grade": "absorption \u2014 heavy effort, closed off the low (stopping action)"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-20T20:12:01.529776+00:00",
+"c": 0.6985499859,
+"target": 0.69560003285,
+"inv": 0.70239996905,
+"chance": 0.566,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "B"
 }
 ]
