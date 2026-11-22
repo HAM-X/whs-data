@@ -45,7 +45,7 @@
   "6E 4h": "TREND \u2193",
   "6E 1h": "TREND \u2193",
   "6E 15m": "SIDEWAYS",
-  "6E 5m": "WAIT",
+  "6E 5m": "TREND \u2193",
   "6B 4h": "TREND \u2193",
   "6B 1h": "TREND \u2193",
   "6B 15m": "TREND \u2193",
@@ -64,8 +64,8 @@
   "6J 5m": "WAIT",
   "6C 4h": "TREND \u2193",
   "6C 1h": "BUY ZONE",
-  "6C 15m": "BUY ZONE",
-  "6C 5m": "WATCH",
+  "6C 15m": "WATCH",
+  "6C 5m": "TREND \u2193",
   "6S 4h": "TREND \u2193",
   "6S 1h": "SIDEWAYS",
   "6S 15m": "WAIT",
@@ -76,7 +76,7 @@
   "GC 5m": "WAIT"
  },
  "watch": {},
- "htr_since": "2026-11-22T23:12:01.241092+00:00",
+ "htr_since": "2026-11-22T23:16:00.831579+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
