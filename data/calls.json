@@ -696,8 +696,8 @@
 "target": 0.7040999531,
 "status": "open",
 "r": 0.36,
-"best": 0.52,
-"held": 2,
+"best": 0.93,
+"held": 3,
 "inv": 0.6972500086,
 "shadow": false
 },
@@ -713,9 +713,9 @@
 "stop": 0.6971632504240446,
 "target": 0.7040999531,
 "status": "open",
-"r": 0.39,
-"best": 0.57,
-"held": 8,
+"r": 0.33,
+"best": 1.02,
+"held": 12,
 "inv": 0.6972500086,
 "shadow": false
 }
