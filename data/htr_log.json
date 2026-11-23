@@ -3384,7 +3384,23 @@
 "target": 1.3110499975,
 "inv": 1.312411496542489,
 "chance": 0.155,
-"status": "open",
+"status": "miss",
 "grade": "demand in control \u2014 wide bar on effort, closed on the high"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-23T07:12:01.049018+00:00",
+"c": 0.6991500258,
+"target": 0.70239996905,
+"inv": 0.69560003285,
+"chance": 0.522,
+"status": "open",
+"wick": true,
+"label": "ACCUMULATION",
+"grade": "shown",
+"phase": "C"
 }
 ]
