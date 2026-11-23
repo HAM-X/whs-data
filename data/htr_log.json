@@ -3418,5 +3418,53 @@
 "label": "DISTRIBUTION",
 "grade": "shown",
 "phase": "D"
+},
+{
+"kind": "campaign",
+"key": "6N",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-23T11:12:01.115034+00:00",
+"c": 0.5469999909,
+"target": 0.5461499691,
+"inv": 0.5563499927,
+"chance": 0.917,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "D"
+},
+{
+"kind": "campaign",
+"key": "6C",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-23T11:12:01.115034+00:00",
+"c": 0.6982499957,
+"target": 0.69560003285,
+"inv": 0.70239996905,
+"chance": 0.61,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "C"
+},
+{
+"kind": "campaign",
+"key": "6S",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-23T11:12:01.115034+00:00",
+"c": 1.195050001,
+"target": 1.2017249469999998,
+"inv": 1.1826249949999998,
+"chance": 0.651,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "A"
 }
 ]
