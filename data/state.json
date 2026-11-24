@@ -3,7 +3,6 @@
  "last_ok_day": "2026-11-24",
  "last_brief_day": "2026-11-24",
  "news_alerted": [
-  "USD|Congressional Elections|2026-11-03T15:16:00+00:00",
   "NZD|Employment Change q/q|2026-11-03T21:45:00+00:00",
   "NZD|Unemployment Rate|2026-11-03T21:45:00+00:00",
   "GBP|BOE Monetary Policy Report|2026-11-05T12:00:00+00:00",
@@ -74,7 +73,7 @@
  "watch": {
   "6S 1h": "resistance@1.1981"
  },
- "htr_since": "2026-11-24T15:12:01.372406+00:00",
+ "htr_since": "2026-11-24T15:16:02.182977+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
@@ -1019,16 +1018,16 @@
   },
   "6S|15m": {
    "id": "2026-11-20T00:00:00+00:00",
-   "label": "leaning ACCUMULATION",
+   "label": "ACCUMULATION",
    "side": 1,
-   "grade": "lean",
+   "grade": "shown",
    "S": 1.187399983,
    "R": 1.196949959,
-   "chance": 0.7395332721255024,
+   "chance": 0.857332311620471,
    "inv": 1.1859674865999998,
-   "phase": "B",
+   "phase": "D",
    "tf": "15m",
-   "tag": "2026-11-20T00:00:00+00:00|leaning ACCUMULATION"
+   "tag": "2026-11-20T00:00:00+00:00|ACCUMULATION"
   },
   "GC|1d": {
    "id": "2026-03-22T22:00:00+00:00",
@@ -1057,9 +1056,7 @@
    "tag": "2026-11-20T18:45:00+00:00|leaning ACCUMULATION"
   }
  },
- "camp_pend": {
-  "6S|15m": "2026-11-20T00:00:00+00:00|ACCUMULATION"
- },
+ "camp_pend": {},
  "camp_hits": {
   "GC|1d|2026-03-22T22:00:00+00:00|confirm|-1": "2026-10-30T00:12:14.208995+00:00",
   "6C|1h|2026-10-14T14:00:00+00:00|confirm|1": "2026-10-30T10:12:01.287767+00:00",
