@@ -3842,7 +3842,7 @@
 "target": 1.3088999385,
 "inv": 1.3137000205,
 "chance": 0.708,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
@@ -3858,7 +3858,7 @@
 "target": 0.6625249982,
 "inv": 0.6589689142061068,
 "chance": 0.051,
-"status": "open",
+"status": "miss",
 "grade": "no supply \u2014 the test passed"
 }
 ]
