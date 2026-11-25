@@ -770,11 +770,12 @@
 "entry": 3555.199951,
 "stop": 3561.108540711075,
 "target": 3456.200196,
-"status": "open",
-"r": -0.05,
+"status": "closed",
+"r": -1.05,
 "best": 0.0,
-"held": 0,
+"held": 1,
 "inv": 3558.0,
-"shadow": true
+"shadow": true,
+"closed": "2026-11-25T18:05:00+00:00"
 }
 ]
