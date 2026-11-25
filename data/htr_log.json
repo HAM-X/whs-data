@@ -3352,7 +3352,7 @@
 "target": 0.6670750082,
 "inv": 0.6583749950000001,
 "chance": 0.549,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
