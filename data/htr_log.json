@@ -3860,5 +3860,21 @@
 "chance": 0.051,
 "status": "miss",
 "grade": "no supply \u2014 the test passed"
+},
+{
+"kind": "campaign",
+"key": "GC",
+"tf": "15m",
+"side": 1,
+"t": "2026-11-25T10:12:01.183671+00:00",
+"c": 3556.600098,
+"target": 3785.050049,
+"inv": 3408.849853,
+"chance": 0.393,
+"status": "open",
+"wick": true,
+"label": "leaning ACCUMULATION",
+"grade": "lean",
+"phase": "B"
 }
 ]
