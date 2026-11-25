@@ -2728,7 +2728,7 @@
 "target": 0.701799959,
 "inv": 0.6958000362,
 "chance": 0.742,
-"status": "open",
+"status": "hit",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -3765,7 +3765,7 @@
 "target": 0.55000001195,
 "inv": 0.54720002415,
 "chance": 0.679,
-"status": "open",
+"status": "miss",
 "wick": true,
 "label": "leaning ACCUMULATION",
 "grade": "lean",
@@ -3813,7 +3813,7 @@
 "target": 0.6625249982,
 "inv": 0.6664117152152951,
 "chance": 0.518,
-"status": "open",
+"status": "hit",
 "grade": "undecided \u2014 neither a clean test nor a break"
 },
 {
@@ -3831,5 +3831,21 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "campaign",
+"key": "6B",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-25T03:12:01.501672+00:00",
+"c": 1.310299993,
+"target": 1.3088999385,
+"inv": 1.3137000205,
+"chance": 0.708,
+"status": "open",
+"wick": true,
+"label": "leaning DISTRIBUTION",
+"grade": "lean",
+"phase": "A"
 }
 ]
