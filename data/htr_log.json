@@ -3802,5 +3802,18 @@
 "label": "leaning DISTRIBUTION",
 "grade": "lean",
 "phase": "B"
+},
+{
+"kind": "touch",
+"key": "6A",
+"tf": "15m",
+"side": -1,
+"t": "2026-11-25T00:30:00+00:00",
+"c": 0.6643999815,
+"target": 0.6625249982,
+"inv": 0.6664117152152951,
+"chance": 0.518,
+"status": "open",
+"grade": "undecided \u2014 neither a clean test nor a break"
 }
 ]
