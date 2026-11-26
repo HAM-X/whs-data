@@ -1,8 +1,14 @@
 {
- "run_utc": "2026-11-26T07:16:41.763702+00:00",
- "run_local": "Thu 26 Nov 10:16",
+ "run_utc": "2026-11-26T08:12:01.241212+00:00",
+ "run_local": "Thu 26 Nov 11:12",
  "backfill": false,
- "problems": [],
+ "problems": [
+  {
+   "key": "ALL:stale",
+   "sym": "ALL",
+   "text": "9 of 9 futures behind at once \u2014 exchange holiday or Yahoo outage"
+  }
+ ],
  "symbols": {
   "6E": {
    "kind": "future",
@@ -14,7 +20,7 @@
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6B": {
    "kind": "future",
@@ -26,55 +32,55 @@
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6A": {
    "kind": "future",
    "yahoo": "6A=F",
    "bars": 12090,
    "added": 0,
-   "revised": 42,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6N": {
    "kind": "future",
    "yahoo": "6N=F",
    "bars": 12092,
    "added": 0,
-   "revised": 25,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6J": {
    "kind": "future",
    "yahoo": "6J=F",
    "bars": 12090,
    "added": 0,
-   "revised": 27,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6C": {
    "kind": "future",
    "yahoo": "6C=F",
    "bars": 12094,
    "added": 0,
-   "revised": 30,
+   "revised": 0,
    "first": "2024-10-18T14:00:00+00:00",
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "6S": {
    "kind": "future",
@@ -86,7 +92,7 @@
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "GC": {
    "kind": "future",
@@ -98,7 +104,7 @@
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "DX": {
    "kind": "future",
@@ -110,89 +116,89 @@
    "last": "2026-11-26T04:00:00+00:00",
    "last_local": "Thu 26 Nov 07:00",
    "error": null,
-   "status": "ok"
+   "status": "problem"
   },
   "EURUSD": {
    "kind": "spot",
    "yahoo": "EURUSD=X",
-   "bars": 12989,
-   "added": 0,
+   "bars": 12990,
+   "added": 1,
    "revised": 101,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "GBPUSD": {
    "kind": "spot",
    "yahoo": "GBPUSD=X",
-   "bars": 12992,
-   "added": 0,
+   "bars": 12993,
+   "added": 1,
    "revised": 102,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "AUDUSD": {
    "kind": "spot",
    "yahoo": "AUDUSD=X",
-   "bars": 13054,
-   "added": 0,
-   "revised": 3,
+   "bars": 13055,
+   "added": 1,
+   "revised": 0,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "NZDUSD": {
    "kind": "spot",
    "yahoo": "NZDUSD=X",
-   "bars": 13056,
-   "added": 0,
-   "revised": 3,
+   "bars": 13057,
+   "added": 1,
+   "revised": 0,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "USDJPY": {
    "kind": "spot",
    "yahoo": "JPY=X",
-   "bars": 12917,
-   "added": 0,
+   "bars": 12918,
+   "added": 1,
    "revised": 101,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "USDCAD": {
    "kind": "spot",
    "yahoo": "CAD=X",
-   "bars": 13056,
-   "added": 0,
+   "bars": 13057,
+   "added": 1,
    "revised": 102,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
   "USDCHF": {
    "kind": "spot",
    "yahoo": "CHF=X",
-   "bars": 12934,
-   "added": 0,
-   "revised": 5,
+   "bars": 12935,
+   "added": 1,
+   "revised": 0,
    "first": "2024-10-16T23:00:00+00:00",
-   "last": "2026-11-26T06:00:00+00:00",
-   "last_local": "Thu 26 Nov 09:00",
+   "last": "2026-11-26T07:00:00+00:00",
+   "last_local": "Thu 26 Nov 10:00",
    "error": null,
    "status": "ok"
   },
