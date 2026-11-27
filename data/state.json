@@ -1,11 +1,11 @@
 {
  "problems": {
+  "ALL:stale": "9 of 9 futures behind at once \u2014 exchange holiday or Yahoo outage",
   "ALL:gaps": "8 of 9 futures missing hours at once \u2014 exchange holiday or Yahoo outage"
  },
  "last_ok_day": "2026-11-26",
  "last_brief_day": "2026-11-27",
  "news_alerted": [
-  "NZD|Parliamentary Elections|2026-11-06T21:45:00+00:00",
   "USD|Core CPI m/m|2026-11-10T13:30:00+00:00",
   "USD|CPI m/m|2026-11-10T13:30:00+00:00",
   "GBP|GDP m/m|2026-11-12T07:00:00+00:00",
@@ -65,7 +65,7 @@
   "GC 5m": "TREND \u2191"
  },
  "watch": {},
- "htr_since": "2026-11-27T21:12:00.917812+00:00",
+ "htr_since": "2026-11-27T22:12:01.003409+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
