@@ -1,6 +1,5 @@
 {
  "problems": {
-  "ALL:stale": "9 of 9 futures behind at once \u2014 exchange holiday or Yahoo outage",
   "ALL:gaps": "8 of 9 futures missing hours at once \u2014 exchange holiday or Yahoo outage"
  },
  "last_ok_day": "2026-11-26",
@@ -65,7 +64,7 @@
   "GC 5m": "TREND \u2191"
  },
  "watch": {},
- "htr_since": "2026-11-27T22:12:01.003409+00:00",
+ "htr_since": "2026-11-27T23:12:00.747489+00:00",
  "htr_armed": {
   "6A|15m|2026-10-28T00:30:00+00:00|1": true,
   "6A|15m|2026-10-28T00:30:00+00:00|-1": false,
