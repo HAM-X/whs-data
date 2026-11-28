@@ -1,6 +1,6 @@
 {
- "run_utc": "2026-11-28T00:12:00.802166+00:00",
- "run_local": "Sat 28 Nov 03:12",
+ "run_utc": "2026-11-28T01:12:00.814960+00:00",
+ "run_local": "Sat 28 Nov 04:12",
  "backfill": false,
  "problems": [
   {
@@ -146,7 +146,7 @@
    "kind": "spot",
    "yahoo": "AUDUSD=X",
    "bars": 13095,
-   "added": 1,
+   "added": 0,
    "revised": 0,
    "first": "2024-10-16T23:00:00+00:00",
    "last": "2026-11-27T23:00:00+00:00",
@@ -158,7 +158,7 @@
    "kind": "spot",
    "yahoo": "NZDUSD=X",
    "bars": 13097,
-   "added": 1,
+   "added": 0,
    "revised": 0,
    "first": "2024-10-16T23:00:00+00:00",
    "last": "2026-11-27T23:00:00+00:00",
@@ -182,8 +182,8 @@
    "kind": "spot",
    "yahoo": "CAD=X",
    "bars": 13097,
-   "added": 1,
-   "revised": 119,
+   "added": 0,
+   "revised": 120,
    "first": "2024-10-16T23:00:00+00:00",
    "last": "2026-11-27T23:00:00+00:00",
    "last_local": "Sat 28 Nov 02:00",
